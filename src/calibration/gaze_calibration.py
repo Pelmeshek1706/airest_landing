@@ -65,6 +65,7 @@ class GazeCalibration:
         self.calibration_frame_count = 0
         self.test_point_index = 0
         self.test_frame_count = 0
+        self.fl = 0 # for debugging of horizontal/vertical ratios
 
     def _init_iris_measurement(self):
         self.base_iris_size = 0
@@ -171,6 +172,7 @@ class GazeCalibration:
         self.current_calib_point += 1
         self.fixation_frame_count = 0
         self.calibration_frame_count = 0
+        self.fl = self.current_calib_point
 
     def _finalize_calibration(self):
         """
@@ -228,6 +230,12 @@ class GazeCalibration:
         """
         hr = self.gaze_tracking.horizontal_ratio()
         vr = self.gaze_tracking.vertical_ratio()
+
+        if self.fl == self.current_calib_point:
+            print('\ncalib p', self.current_calib_point)
+            print('hr', hr)
+            print('vr', vr)
+            self.fl = -1
 
         if hr is not None and vr is not None:
             self.calibration_ratios[calib_index].append([hr, vr])
