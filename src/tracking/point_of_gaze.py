@@ -70,12 +70,19 @@ class PointOfGaze:
 
         if self.stabilize:
             return self._stabilize_point(raw_x, raw_y)
-        else:
-            # optionally update iris measurement if gaze appears centered
-            if self.looking_straight_ahead(raw_x, raw_y, self.gaze_calibration):
-                self.current_iris_size = self.gaze_calibration.measure_iris_diameter()
-                self.logger.debug(f'iris updated to {self.current_iris_size}')
-            return raw_x, raw_y
+
+        self._update_iris_on_centered_gaze(raw_x, raw_y)
+        return raw_x, raw_y
+
+    def _update_iris_on_centered_gaze(self, raw_x, raw_y):
+        """
+        refresh the stored iris measurement when the gaze is centered.
+        this is based on the assumption that the iris diameter is most accurately measured
+        when the user is looking straight ahead.
+        """
+        if self.looking_straight_ahead(raw_x, raw_y, self.gaze_calibration):
+            self.current_iris_size = self.gaze_calibration.measure_iris_diameter()
+            self.logger.debug(f'iris updated to {self.current_iris_size}')
 
     def _compute_raw_gaze(self):
         """
@@ -140,21 +147,23 @@ class PointOfGaze:
         
         :param x: current x coordinate.
         :param y: current y coordinate.
-        :return: true if consistent movement is detected, false otherwise.
+        :return: True if consistent movement is detected, False otherwise.
         """
-        if self.candidate_eye_move or self.ongoing_eye_move:
-            self.move_cluster_x.append(x)
-            self.move_cluster_y.append(y)
-            combined = list(self.current_cluster_x) + list(self.move_cluster_x)
-            if self._has_consistent_movement(combined, self.nb_same):
-                self.ongoing_eye_move = True
-                self.candidate_eye_move = False
-                self._reset_all_clusters()
-                return True
-            else:
-                self.ongoing_eye_move = False
-                self._reset_all_clusters()
-        return False
+        if not (self.candidate_eye_move or self.ongoing_eye_move):
+            return False
+
+        self.move_cluster_x.append(x)
+        self.move_cluster_y.append(y)
+        combined = list(self.current_cluster_x) + list(self.move_cluster_x)
+        consistent = self._has_consistent_movement(combined, self.nb_same)
+
+        # reset clusters regardless of consistency
+        self._reset_all_clusters()
+        self.ongoing_eye_move = consistent
+        if consistent:
+            self.candidate_eye_move = False
+
+        return consistent
 
     def _update_candidate_cluster(self, x, y):
         """
@@ -162,23 +171,32 @@ class PointOfGaze:
         
         :param x: current x coordinate.
         :param y: current y coordinate.
-        :return: true if the candidate cluster was updated, false otherwise.
+        :return: True if the candidate cluster was updated, False otherwise.
         """
-        if self.candidate_cluster_x:
-            if self._point_within_cluster(self.candidate_cluster_x, x):
-                self.candidate_cluster_x.append(x)
-                self.candidate_cluster_y.append(y)
-                # promote candidate cluster if it reaches minimum size
-                if len(self.candidate_cluster_x) >= self.cluster_min_size:
-                    self.current_cluster_x = self.candidate_cluster_x.copy()
-                    self.current_cluster_y = self.candidate_cluster_y.copy()
-                    self.candidate_cluster_x.clear()
-                    self.candidate_cluster_y.clear()
-                return True
-            else:
-                self.candidate_cluster_x.clear()
-                self.candidate_cluster_y.clear()
-        return False
+        # if there's no candidate cluster data, nothing to update
+        if not self.candidate_cluster_x:
+            return False
+
+        # if the new point does not fit within the candidate cluster,
+        # clear the candidate data and return False immediately
+        if not self._point_within_cluster(self.candidate_cluster_x, x):
+            self.candidate_cluster_x.clear()
+            self.candidate_cluster_y.clear()
+            return False
+
+        # if the point fits, append the new coordinates
+        self.candidate_cluster_x.append(x)
+        self.candidate_cluster_y.append(y)
+
+        # if the candidate cluster has reached the minimum size,
+        # promote it to the current cluster and clear the candidate cluster
+        if len(self.candidate_cluster_x) >= self.cluster_min_size:
+            self.current_cluster_x = self.candidate_cluster_x.copy()
+            self.current_cluster_y = self.candidate_cluster_y.copy()
+            self.candidate_cluster_x.clear()
+            self.candidate_cluster_y.clear()
+
+        return True
 
     def _update_current_cluster(self, x, y):
         """
@@ -211,10 +229,7 @@ class PointOfGaze:
             mean_x = round(sum(self.current_cluster_x) / len(self.current_cluster_x))
             mean_y = round(sum(self.current_cluster_y) / len(self.current_cluster_y))
             return mean_x, mean_y
-        elif self.candidate_cluster_x and self.candidate_cluster_y:
-            mean_x = round(sum(self.candidate_cluster_x) / len(self.candidate_cluster_x))
-            mean_y = round(sum(self.candidate_cluster_y) / len(self.candidate_cluster_y))
-            return mean_x, mean_y
+        
         else:
             return default_x, default_y
 
@@ -249,19 +264,18 @@ class PointOfGaze:
         
         :param values: list of numeric values.
         :param nb_same: required consecutive moves.
-        :return: true if movement is consistent, false otherwise.
+        :return: True if movement is consistent, False otherwise.
         """
         if len(values) < nb_same + 1:
             return False
-        allowed = self.nb_interv
-        for i in range(-nb_same - 1, -1):
-            diff1 = values[i+1] - values[i]
-            diff2 = values[i+2] - values[i+1]
-            if diff1 * diff2 <= 0:
-                allowed -= 1
-                if allowed < 0:
-                    return False
-        return True
+
+        # count the number of inconsistencies over the last nb_same+1 values
+        inconsistencies = sum(
+            1
+            for i in range(-nb_same - 1, -1)
+            if (values[i+1] - values[i]) * (values[i+2] - values[i+1]) <= 0
+        )
+        return inconsistencies <= self.nb_interv
 
     @staticmethod
     def looking_straight_ahead(est_x, est_y, gaze_calib):
@@ -273,9 +287,9 @@ class PointOfGaze:
         :param gaze_calib: calibration object containing screen dimensions.
         :return: true if gaze is in the center region, false otherwise.
         """
-        wmargin = gaze_calib.fsw * 0.3
-        hmargin = gaze_calib.fsh * 0.5
-        wmiddle = gaze_calib.fsw / 2
-        hmiddle = gaze_calib.fsh / 2
+        wmargin = gaze_calib.frame_width * 0.3
+        hmargin = gaze_calib.frame_height * 0.5
+        wmiddle = gaze_calib.frame_width / 2
+        hmiddle = gaze_calib.frame_height / 2
         return (wmiddle - wmargin < est_x < wmiddle + wmargin) and (hmiddle - hmargin < est_y < hmiddle + hmargin)
     

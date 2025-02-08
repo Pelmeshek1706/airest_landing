@@ -131,7 +131,7 @@ class GazeCalibration:
 
         When all calibration points are processed, finalizes calibration.
         """
-        self.fullscreen_frame.fill(50)
+        self.fullscreen_frame.fill(255)
         if self.current_calib_point < self.num_calib_points:
             self._handle_calibration_phase()
         else:
@@ -179,7 +179,7 @@ class GazeCalibration:
         Once all calibration points are processed, compute the extreme ratios and finalize iris size.
         """
         self._compute_extreme_ratios()
-        if self.iris_size_count > 0:
+        if self.iris_size_count > 0: # if no iris measurements were recorded in that frame
             self.base_iris_size /= self.iris_size_count
         self.calibration_completed = True
 
@@ -193,7 +193,7 @@ class GazeCalibration:
             (80, 200),
             cv2.FONT_HERSHEY_COMPLEX,
             1.7,
-            (255, 255, 255),
+            (25),
             2,
             cv2.LINE_AA
         )
@@ -203,7 +203,7 @@ class GazeCalibration:
             (80, 300),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.7,
-            (255, 255, 255),
+            (25),
             2,
             cv2.LINE_AA
         )
@@ -219,6 +219,10 @@ class GazeCalibration:
             (0, 0, 255),
             -1
         )
+
+    def _update_iris_size(self, iris_d):
+        self.base_iris_size += iris_d
+        self.iris_size_count += 1
 
     def _record_gaze_data(self, calib_index):
         """
@@ -245,40 +249,49 @@ class GazeCalibration:
         if self.calibration_points[calib_index] == center_point:
             iris_diameter = self._measure_iris_diameter()
             if iris_diameter:
-                self.base_iris_size += iris_diameter
-                self.iris_size_count += 1
+                self._update_iris_size(iris_diameter)
 
     def _compute_extreme_ratios(self):
         """
         Compute the extreme horizontal and vertical ratios from the calibration data.
-
-        Iterates over the calibration grid and for each edge point collects the ratio,
-        then uses a density-based clustering approach to select the most frequent value.
+        
+        This version precomputes the indices for the edges of the calibration grid
+        and collects the corresponding ratios using list comprehensions.
         """
         vertical_points, horizontal_points = self.grid_points
-        left_ratios, right_ratios = [], []
-        top_ratios, bottom_ratios = [], []
 
-        for v in range(vertical_points):
-            for h in range(horizontal_points):
-                idx = v * horizontal_points + h
-                ratios = self.calibration_ratios[idx]
-                if ratios:
-                    # for horizontal ratios, use the first element of the pair.
-                    if h == 0:
-                        left_ratios.append(ratios[0])
-                    elif h == horizontal_points - 1:
-                        right_ratios.append(ratios[0])
-                    # for vertical ratios, use the second element of the pair.
-                    if v == 0:
-                        top_ratios.append(ratios[1])
-                    elif v == vertical_points - 1:
-                        bottom_ratios.append(ratios[1])
-
+        # compute indices for each edge:
+        left_edge_indices = [v * horizontal_points for v in range(vertical_points)]
+        right_edge_indices = [v * horizontal_points + (horizontal_points - 1) for v in range(vertical_points)]
+        top_edge_indices = list(range(horizontal_points))
+        bottom_edge_indices = list(range((vertical_points - 1) * horizontal_points, vertical_points * horizontal_points))
+        
+        # gather the ratios (if a given calibration point exists, i.e. non-empty)
+        left_ratios = [self.calibration_ratios[idx][0] for idx in left_edge_indices
+                       if self.calibration_ratios[idx]]
+        right_ratios = [self.calibration_ratios[idx][0] for idx in right_edge_indices
+                        if self.calibration_ratios[idx]]
+        top_ratios = [self.calibration_ratios[idx][1] for idx in top_edge_indices
+                      if self.calibration_ratios[idx]]
+        bottom_ratios = [self.calibration_ratios[idx][1] for idx in bottom_edge_indices
+                         if self.calibration_ratios[idx]]
+        
+        # Fallbacks in case any list is empty (adjust as needed)
+        if not left_ratios:
+            left_ratios = [0.0]
+        if not right_ratios:
+            right_ratios = [1.0]
+        if not top_ratios:
+            top_ratios = [0.0]
+        if not bottom_ratios:
+            bottom_ratios = [1.0]
+        
+        # cluster the collected ratios using the density-based approach
         self.leftmost_hr = GazeCalibration.density_cluster_1d(left_ratios)
         self.rightmost_hr = GazeCalibration.density_cluster_1d(right_ratios)
         self.top_vr = GazeCalibration.density_cluster_1d(top_ratios)
         self.bottom_vr = GazeCalibration.density_cluster_1d(bottom_ratios)
+        
         self.logger.debug(
             f"Extreme ratios computed: left {self.leftmost_hr}, right {self.rightmost_hr}, "
             f"top {self.top_vr}, bottom {self.bottom_vr}"

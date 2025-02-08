@@ -61,18 +61,21 @@ class EPOGAnalyzer:
         or the escape key is pressed.
         """
         while True:
-            _, frame = self.webcam.read()
-            
-            if frame is not None:
-                screen_x, screen_y = self.analyze(frame)
-                if screen_x is not None and screen_y is not None:
-                    print(f"calibration complete. screen coordinates: {screen_x}, {screen_y}")
-                    break
+            ret, frame = self.webcam.read()
+            if not ret or frame is None:
+                continue
 
-            if cv2.waitKey(1) == 27:  # escape key
-                self.webcam.release()
-                cv2.destroyAllWindows()
+            screen_x, screen_y = self.analyze(frame)
+            if screen_x is not None and screen_y is not None:
+                print(f"calibration complete. screen coordinates: {screen_x}, {screen_y}")
                 break
+
+            # check for escape key (27) -- mask low-order bits for compatibility
+            if cv2.waitKey(1) & 0xFF == 27:
+                break
+
+        self.webcam.release()
+        cv2.destroyAllWindows()
 
     def analyze(self, frame):
         """
@@ -81,34 +84,33 @@ class EPOGAnalyzer:
 
         :param frame: image frame from the webcam.
         :return: tuple (screen_x, screen_y) if calibration and testing are complete;
-                 otherwise, (None, None)
+                otherwise, (None, None)
         """
         # refresh and analyze the current frame for gaze data
         self.gaze_tr.refresh(frame)
-        screen_x, screen_y = None, None
-
+        
         # always ensure the calibration window is sized to the monitor
         cv2.resizeWindow(self.calib_window, self.monitor['width'], self.monitor['height'])
-
-        # if calibration is not complete, show calibration frame
+        
+        # if calibration is not complete, update the window position and show the calibration frame
         if not self.gaze_calib.is_completed():
             self._update_calib_window_position()
             calib_frame = self.gaze_calib.calibrate_gaze()
             cv2.imshow(self.calib_window, calib_frame)
-
-        # if calibration is complete but testing is not, show test frame
-        elif not self.gaze_calib.is_tested():
+            return None, None
+        
+        # if calibration is complete but testing is not, show the test frame
+        if not self.gaze_calib.is_tested():
             calib_frame = self.gaze_calib.test_gaze(self.pog)
             cv2.imshow(self.calib_window, calib_frame)
-
-        # if both calibration and testing are complete, hide the calibration window
-        # and get the final gaze point
-        else:
-            if not self.windows_closed:
-                self._close_calib_window()
-            screen_x, screen_y = self.pog.point_of_gaze()
-
-        return screen_x, screen_y
+            return None, None
+        
+        # if both calibration and testing are complete, close the calibration window (if not already done)
+        if not self.windows_closed:
+            self._close_calib_window()
+        
+        # get the final gaze point
+        return self.pog.point_of_gaze()
 
     def _update_calib_window_position(self):
         """
