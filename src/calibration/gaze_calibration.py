@@ -9,6 +9,7 @@ calibration measurements.
 import cv2
 import numpy as np
 import logging
+from distortion_calibration import compute_distortion_coefficients
 
 class GazeCalibration:
     """
@@ -19,10 +20,12 @@ class GazeCalibration:
     later used to map raw gaze ratios to actual screen coordinates.
     """
 
-    def __init__(self, gaze_tracking, monitor):
+    def __init__(self, gaze_tracking, monitor, video_source, record):
         self.logger = logging.getLogger(__name__)
         self.gaze_tracking = gaze_tracking
-        self.test_errors_dict = {'x': [], 'y': [], 'xy': []}
+        if video_source or record:
+            debug_errors = True
+        self.errors_dict = {'x': [], 'y': [], 'xy': []}
 
         # initialize extreme ratio values
         self.leftmost_hr = 0
@@ -36,16 +39,21 @@ class GazeCalibration:
         self._init_timing_parameters()
         self._init_fullscreen_frame(monitor)
         self._init_calibration_grid(monitor)
-        self._init_test_points(monitor)
+        self._init_test_points(monitor, debug_errors)
 
     def _init_calibration_grid(self, monitor):
         self.grid_points = [3, 3]
         self.num_calib_points, self.calibration_points = self._setup_calibration_points(monitor)
         self.calibration_ratios = [[] for _ in range(self.num_calib_points)]
+        self.calibration_data = [[] for _ in range(self.num_calib_points)]
 
-    def _init_test_points(self, monitor):
-        self.num_test_points = 5
-        self.test_points = self._setup_test_points(monitor)
+    def _init_test_points(self, monitor, debug_errors):
+        if debug_errors:
+            self.test_points = self._generate_test_points(monitor)
+            self.num_test_points = len(self.test_points)
+        else:
+            self.num_test_points = 5
+            self.test_points = self._setup_test_points(monitor)
 
     def _init_fullscreen_frame(self, monitor):
         self.circle_radius = 20
@@ -91,7 +99,7 @@ class GazeCalibration:
                 x = h * step_x + self.circle_radius
                 y = v * step_y + self.circle_radius
                 calibration_points.append((x, y))
-        return len(calibration_points), calibration_points
+        return len(calibration_points), np.array(calibration_points)
 
     def _setup_test_points(self, monitor):
         """
@@ -106,8 +114,36 @@ class GazeCalibration:
         max_x = width - self.circle_radius
         min_y = self.circle_radius
         max_y = height - self.circle_radius
-        points = [np.array([np.random.randint(min_x, max_x), np.random.randint(min_y, max_y)])
+        test_points = [np.array([np.random.randint(min_x, max_x), np.random.randint(min_y, max_y)])
                   for _ in range(self.num_test_points)]
+        return np.array(test_points)
+
+    def _generate_test_points(self, monitor, rows=3, cols=3, margin_ratio=0.1):
+        """
+        deterministically generate test points that are scattered across the screen
+        but not at the extreme edges.
+        
+        :param monitor: dict with keys 'width' and 'height'
+        :param rows: number of rows in the grid
+        :param cols: number of columns in the grid
+        :param margin_ratio: fraction of width/height to leave as margin from the edges
+        :return: numpy array of test points (each as (x, y))
+        """
+        width = monitor['width']
+        height = monitor['height']
+        margin_x = margin_ratio * width
+        margin_y = margin_ratio * height
+
+        # available space after margins
+        available_width = width - 2 * margin_x
+        available_height = height - 2 * margin_y
+
+        # compute equally spaced x and y values within the available space
+        xs = [int(margin_x + i * (available_width / (cols - 1))) for i in range(cols)]
+        ys = [int(margin_y + i * (available_height / (rows - 1))) for i in range(rows)]
+
+        # generate points as all combinations of xs and ys
+        points = [(x, y) for y in ys for x in xs]
         return np.array(points)
 
     def _create_fullscreen_frame(self, monitor):
@@ -120,7 +156,7 @@ class GazeCalibration:
         self.logger.debug(f"Monitor resolution: {monitor['height']} x {monitor['width']}")
         return np.zeros((monitor['height'], monitor['width'], 3), dtype=np.uint8)
 
-    def calibrate_gaze(self):
+    def calibrate_gaze(self, pog):
         """
         Process the calibration state for each frame.
 
@@ -131,6 +167,7 @@ class GazeCalibration:
 
         When all calibration points are processed, finalizes calibration.
         """
+        self.pog = pog
         self.fullscreen_frame.fill(255)
         if self.current_calib_point < self.num_calib_points:
             self._handle_calibration_phase()
@@ -168,6 +205,11 @@ class GazeCalibration:
         self.calibration_ratios[self.current_calib_point] = GazeCalibration.cluster_calibration_ratios(
             self.calibration_ratios[self.current_calib_point]
         )
+        
+        # save final ratios for the current point
+        self.calibration_data[self.current_calib_point] = (*self.calibration_ratios[self.current_calib_point],
+                                                           *self.calibration_points[self.current_calib_point])
+
         # reset counters for the next calibration point.
         self.current_calib_point += 1
         self.fixation_frame_count = 0
@@ -182,6 +224,7 @@ class GazeCalibration:
         if self.iris_size_count > 0: # if no iris measurements were recorded in that frame
             self.base_iris_size /= self.iris_size_count
         self.calibration_completed = True
+        self.compute_polynomial_mapping()
 
     def _display_instruction(self):
         """
@@ -234,22 +277,22 @@ class GazeCalibration:
         """
         hr = self.gaze_tracking.horizontal_ratio()
         vr = self.gaze_tracking.vertical_ratio()
+        
+        if hr is not None and vr is not None:
+            self.calibration_ratios[calib_index].append([hr, vr])
+
+        # check if the current calibration point is the center point.
+        center_point = [self.frame_width // 2, self.frame_height // 2]
+        if (self.calibration_points[calib_index] == center_point).all():
+            iris_diameter = self._measure_iris_diameter()
+            if iris_diameter:
+                self._update_iris_size(iris_diameter)
 
         if self.fl == self.current_calib_point:
             print('\ncalib p', self.current_calib_point)
             print('hr', hr)
             print('vr', vr)
             self.fl = -1
-
-        if hr is not None and vr is not None:
-            self.calibration_ratios[calib_index].append([hr, vr])
-
-        # check if the current calibration point is the center point.
-        center_point = (self.frame_width // 2, self.frame_height // 2)
-        if self.calibration_points[calib_index] == center_point:
-            iris_diameter = self._measure_iris_diameter()
-            if iris_diameter:
-                self._update_iris_size(iris_diameter)
 
     def _compute_extreme_ratios(self):
         """
@@ -297,6 +340,21 @@ class GazeCalibration:
             f"top {self.top_vr}, bottom {self.bottom_vr}"
         )
 
+    def compute_polynomial_mapping(self):
+        # Assume self.calibration_data is a list of tuples [(hr, vr, x, y), ...]
+        data = np.array(self.calibration_data)
+        hr = data[:, 0]
+        vr = data[:, 1]
+        x_values = data[:, 2]
+        y_values = data[:, 3]
+        
+        # Build design matrix: [hr^2, vr^2, hr*vr, hr, vr, 1]
+        A = np.column_stack([hr**2, vr**2, hr*vr, hr, vr, np.ones_like(hr)])
+        
+        # Solve least squares for x mapping and y mapping
+        self.poly_x = np.linalg.lstsq(A, x_values, rcond=None)[0]
+        self.poly_y = np.linalg.lstsq(A, y_values, rcond=None)[0]
+
     @staticmethod
     def density_cluster_1d(data):
         """
@@ -332,25 +390,41 @@ class GazeCalibration:
 
     def test_gaze(self, pog):
         """
-        Display test points and the estimated gaze for evaluation of calibration accuracy.
+        process the test phase for each frame.
+        
+        this method displays test points, the estimated gaze,
+        and records errors for evaluation of calibration accuracy.
+        once all test points have been processed, it prints aggregated errors.
+        
+        :param pog: the PointOfGaze object used for gaze estimation.
+        :return: the fullscreen frame with test overlays.
         """
-        self.fullscreen_frame.fill(50)
+        self.pog = pog
+        self.fullscreen_frame.fill(255)
+        
         if self.test_point_index < self.num_test_points:
-            if self.test_frame_count < self.test_frames:
-                self._display_test_point(self.test_point_index)
-                self._display_estimated_gaze(pog)
-                self.test_frame_count += 1
-            else:
-                # proceed to the next test point and reset the test frame counter.
-                self.test_point_index += 1
-                self.test_frame_count = 0
+            self._handle_test_phase()
         else:
             self.testing_completed = True
-            print(f"\nAggregated estimation errors\
-                    \nX: {np.mean(np.abs(self.test_errors_dict['x']))} \
-                    \nY: {np.mean(np.abs(self.test_errors_dict['y']))} \
-                    \nXY: {np.mean(np.abs(self.test_errors_dict['xy']))}\n")
+            self.print_aggregated_errors()
+        
         return self.fullscreen_frame
+
+    def _handle_test_phase(self):
+        """
+        handle the test phase for the current test point.
+        
+        during the test phase, display the test point and estimated gaze
+        for a fixed number of frames. after that, record the error for the 
+        current test point, advance to the next test point, and reset the frame count.
+        """
+        if self.test_frame_count < self.test_frames:
+            self._display_test_point(self.test_point_index)
+            self._display_estimated_gaze()  # this method draws the gaze dot and logs errors if needed
+            self.test_frame_count += 1
+        else:
+            self.test_point_index += 1
+            self.test_frame_count = 0
 
     def _display_test_point(self, test_index):
         """
@@ -364,13 +438,14 @@ class GazeCalibration:
             -1
         )
 
-    def _display_estimated_gaze(self, pog):
+    def _display_estimated_gaze(self):
         """
         Obtain the estimated gaze from the PointOfGaze object and display it.
 
         The gaze is shown as a small light-gray dot.
         """
-        est_x, est_y = pog.point_of_gaze()
+        est_x, est_y = self._record_error()
+
         if est_x is not None and est_y is not None:
             cv2.circle(
                 self.fullscreen_frame,
@@ -379,13 +454,6 @@ class GazeCalibration:
                 (170, 170, 170),
                 -1
             )
-            # calculate and log error between estimated point and test point
-            err_x = est_x - self.test_points[self.test_point_index, 0]
-            err_y = est_y - self.test_points[self.test_point_index, 1]
-            err_xy = np.linalg.norm(np.asarray([est_x, est_y] - self.test_points[self.test_point_index]))
-            self.test_errors_dict['x'].append(err_x)
-            self.test_errors_dict['y'].append(err_y)
-            self.test_errors_dict['xy'].append(err_xy)
 
     def _measure_iris_diameter(self):
         """
@@ -446,3 +514,54 @@ class GazeCalibration:
         """
         return self.testing_completed
     
+    def _calculate_error(self, screen_x, screen_y):
+        """
+        calculate and log the error between the estimated gaze coordinates and a target point.
+        
+        :param screen_x: estimated gaze x coordinate.
+        :param screen_y: estimated gaze y coordinate.
+        :return: tuple (err_x, err_y, err_xy) representing the error in x, error in y, and Euclidean error.
+        """
+        target_point = self.test_points[self.test_point_index]
+        target_point = np.asarray(target_point)
+        
+        err_x = screen_x - target_point[0]
+        err_y = screen_y - target_point[1]
+        err_xy = np.linalg.norm(np.array([screen_x, screen_y]) - target_point)
+        
+        self.errors_dict['x'].append(err_x)
+        self.errors_dict['y'].append(err_y)
+        self.errors_dict['xy'].append(err_xy)
+        
+        # print(f"Error calculated: err_x={err_x}, err_y={err_y}, err_xy={err_xy}")
+            
+    def _record_error(self):
+        """
+        display the estimated gaze and record the error relative to a target point.
+        
+        the function draws a small light-gray dot at the estimated gaze and then calls
+        calculate_error() to compute and record the error.
+        """
+        est_x, est_y = self.pog.point_of_gaze()
+        if est_x is None or est_y is None:
+            return  # nothing to display or record
+        
+        # record the error using the common calculation function
+        # this function will use self.test_points (or self.calibration_points) based on mode
+        self._calculate_error(est_x, est_y)
+
+        return est_x, est_y
+
+    def print_aggregated_errors(self):
+        """
+        print the aggregated estimation errors for the given mode.
+        """
+
+        mean_x = np.mean(np.abs(self.errors_dict['x']))
+        mean_y = np.mean(np.abs(self.errors_dict['y']))
+        mean_xy = np.mean(np.abs(self.errors_dict['xy']))
+
+        print(f"\nAggregated estimation errors:\n"
+                f"X: {mean_x}\n"
+                f"Y: {mean_y}\n"
+                f"XY: {mean_xy}\n")
