@@ -57,9 +57,9 @@ class GazeTracking:
 
         if results.multi_face_landmarks:
             # use the first detected face
-            landmarks = results.multi_face_landmarks[0].landmark
-            self.eye_left = Eye(self.frame, landmarks, side=0)
-            self.eye_right = Eye(self.frame, landmarks, side=1)
+            self.landmarks = results.multi_face_landmarks[0].landmark
+            self.eye_left = Eye(self.frame, self.landmarks, side=0)
+            self.eye_right = Eye(self.frame, self.landmarks, side=1)
         else:
             self.eye_left = None
             self.eye_right = None
@@ -92,6 +92,8 @@ class GazeTracking:
         if self.pupils_located:
             left_ratio = self.eye_left.get_horizontal_ratio()
             right_ratio = self.eye_right.get_horizontal_ratio()
+            # left_ratio = self.eye_left.pupil.y / (2 * self.eye_left.center[1])
+            # right_ratio = self.eye_right.pupil.y / (2 * self.eye_right.center[1])
             return (left_ratio + right_ratio) / 2
         return None
 
@@ -104,10 +106,38 @@ class GazeTracking:
         :return: float in [0, 1] if pupils are detected; otherwise None.
         """
         if self.pupils_located:
+            # left_ratio = self.eye_left.get_vertical_ratio()
+            # right_ratio = self.eye_right.get_vertical_ratio()
             left_ratio = self.eye_left.pupil.y / (2 * self.eye_left.center[1])
             right_ratio = self.eye_right.pupil.y / (2 * self.eye_right.center[1])
             return (left_ratio + right_ratio) / 2
         return None
+    
+    def get_head_pitch(self):
+        """
+        estimate head pitch based on face orientation.
+        uses landmarks from MediaPipe's face mesh (landmark 10 for forehead, 152 for chin)
+        and returns a pitch offset. When the head is straight, assume the eyes lie at 45% of the face height.
+        A positive offset indicates the eyes are lower (head pitched downward) and a negative offset indicates the opposite.
+        """
+        # convert normalized landmark y-values to pixels
+        forehead_y = self.landmarks[10].y * self.frame.shape[0]
+        chin_y = self.landmarks[152].y * self.frame.shape[0]
+        face_height = chin_y - forehead_y
+        if face_height == 0:
+            return 0.0
+
+        # use the computed eye centers from the Eye objects (already in pixel coordinates)
+        eye_left_y = self.eye_left.center[1]
+        eye_right_y = self.eye_right.center[1]
+        avg_eye_y = (eye_left_y + eye_right_y) / 2.0
+
+        # normalized eye position between forehead and chin; ideally around 0.45 if head is straight
+        normalized_eye_pos = (avg_eye_y - forehead_y) / face_height
+
+        # compute the pitch offset relative to the ideal straight-head value (0.45)
+        pitch_offset = normalized_eye_pos - 0.45
+        return pitch_offset
 
     def is_right(self):
         """
