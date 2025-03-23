@@ -15,6 +15,8 @@ EPOG_TEST_ERROR_DIR = 'epog_test_errors'  # directory to save epog test errors
 # create required output directories if they do not exist
 prepare_directories([OUTPUT_DIR, ANALYSIS_DIR, EPOG_TEST_ERROR_DIR])
 
+TEST_WEBCAM = os.path.join(OUTPUT_DIR, 'test_webcam.mp4')
+
 def main(play_video_test=False, stabilize_gaze=True):
     """
     run the gaze calibration demo and optionally a video test.
@@ -23,7 +25,7 @@ def main(play_video_test=False, stabilize_gaze=True):
     :param stabilize_gaze: if true, enable gaze stabilization in the analyzer.
     """
     # create an epog analyzer instance with gaze stabilization enabled/disabled
-    epog_analyzer = EPOGAnalyzer(stabilize=stabilize_gaze)
+    epog_analyzer = EPOGAnalyzer(stabilize=stabilize_gaze, video_source=TEST_WEBCAM, record=False) #TEST_WEBCAM #None
     
     # perform calibration using the webcam
     epog_analyzer.perform_calibration()
