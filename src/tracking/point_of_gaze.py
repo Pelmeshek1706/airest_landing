@@ -21,23 +21,25 @@ class PointOfGaze:
         self.gaze_tracking = gaze_tracking
         self.gaze_calibration = gaze_calibration
         self.stabilize = stabilize
+        self.monitor = monitor
 
         # split initialization into meaningful subfunctions
-        self._init_cluster_parameters(monitor)
+        self._init_cluster_parameters()
         self._init_cluster_storage()
         self._init_movement_flags()
         # note: iris size is set externally from calibration
 
-    def _init_cluster_parameters(self, monitor):
+    def _init_cluster_parameters(self):
         """
         initialize cluster-related parameters.
         """
         self.nb_same = 2  # required consecutive moves for consistent movement
-        self.nb_interv = 0  # allowed intervening inconsistencies
+        self.nb_interv = 3  # allowed intervening inconsistencies
         self.cluster_min_size = 2  # minimum cluster size to be considered stable
         self.cluster_max_size = 20  # maximum cluster storage size
-        # maximum allowed variation within a cluster (30% of screen width)
-        self.max_intra_cluster_dist = 0.3 * monitor['width']
+        # maximum allowed variation within a cluster (20% of screen width)
+        self.max_intra_cluster_dist_x = 0.2 * self.monitor['width']
+        self.max_intra_cluster_dist_y = 0.2 * self.monitor['height']
 
     def _init_cluster_storage(self):
         """
@@ -85,35 +87,31 @@ class PointOfGaze:
             self.logger.debug(f'iris updated to {self.current_iris_size}')
 
     def _compute_raw_gaze(self):
-        """
-        compute raw gaze coordinates using horizontal and vertical ratios.
-        returns (x, y) or None if gaze cannot be computed.
-        """
         if not self.gaze_tracking.pupils_located:
             print('Pupils are not located')
             return None
 
-        # if iris size is not set, use the calibration baseline
-        if not hasattr(self, 'current_iris_size') or self.current_iris_size is None:
-            print('Could not identify current iris size, setting to the baseline value')
+        if getattr(self, 'current_iris_size', None) in [None, 0]:
+            print('current iris size not valid, setting to baseline value')
             self.current_iris_size = self.gaze_calibration.base_iris_size
             self.logger.debug(f'iris set to baseline {self.current_iris_size}')
 
-        dist_factor = self.gaze_calibration.base_iris_size / self.current_iris_size
         hr = self.gaze_tracking.horizontal_ratio()
         vr = self.gaze_tracking.vertical_ratio()
 
-        try:
-            raw_x = (max(self.gaze_calibration.leftmost_hr - hr, 0) *
-                     self.gaze_calibration.frame_width * dist_factor) / \
-                    (self.gaze_calibration.leftmost_hr - self.gaze_calibration.rightmost_hr)
-            raw_y = (max(vr - self.gaze_calibration.top_vr, 0) *
-                     self.gaze_calibration.frame_height * dist_factor) / \
-                    (self.gaze_calibration.bottom_vr - self.gaze_calibration.top_vr)
-            
-        except ZeroDivisionError:
-            print("division error in raw gaze computation")
-            return None
+        raw_x = (self.gaze_calibration.poly_x[0] * hr**2 +
+                self.gaze_calibration.poly_x[1] * vr**2 +
+                self.gaze_calibration.poly_x[2] * hr * vr +
+                self.gaze_calibration.poly_x[3] * hr +
+                self.gaze_calibration.poly_x[4] * vr +
+                self.gaze_calibration.poly_x[5])
+        
+        raw_y = (self.gaze_calibration.poly_y[0] * hr**2 +
+                self.gaze_calibration.poly_y[1] * vr**2 +
+                self.gaze_calibration.poly_y[2] * hr * vr +
+                self.gaze_calibration.poly_y[3] * hr +
+                self.gaze_calibration.poly_y[4] * vr +
+                self.gaze_calibration.poly_y[5])
 
         if np.isnan(raw_x) or np.isnan(raw_y):
             print('nan encountered in gaze estimation')
@@ -179,7 +177,7 @@ class PointOfGaze:
 
         # if the new point does not fit within the candidate cluster,
         # clear the candidate data and return False immediately
-        if not self._point_within_cluster(self.candidate_cluster_x, x):
+        if not self._point_within_cluster(self.candidate_cluster_x, self.candidate_cluster_y, x, y):
             self.candidate_cluster_x.clear()
             self.candidate_cluster_y.clear()
             return False
@@ -206,7 +204,7 @@ class PointOfGaze:
         :param x: current x coordinate.
         :param y: current y coordinate.
         """
-        if self._point_within_cluster(self.current_cluster_x, x):
+        if self._point_within_cluster(self.current_cluster_x, self.current_cluster_y, x, y):
             self.current_cluster_x.append(x)
             self.current_cluster_y.append(y)
         else:
@@ -244,18 +242,55 @@ class PointOfGaze:
         self.move_cluster_x.clear()
         self.move_cluster_y.clear()
 
-    def _point_within_cluster(self, cluster, x):
+    def _point_within_cluster(self, cluster_x, cluster_y, x, y):
         """
-        check if x is within the allowed distance of every element in cluster.
+        check if the new point (x, y) is within the allowed normalized distance
+        from all points in the cluster using the combined normalized metric.
         
-        :param cluster: deque of numeric values.
-        :param x: value to check.
-        :return: true if x is within the allowed distance, false otherwise.
+        :param cluster_x: deque of x coordinates.
+        :param cluster_y: deque of y coordinates.
+        :param x: new x coordinate.
+        :param y: new y coordinate.
+        :return: True if within allowed distance, False otherwise.
         """
-        for val in cluster:
-            if abs(val - x) > self.max_intra_cluster_dist:
-                return False
-        return True
+        if not cluster_x or not cluster_y:
+            return True
+        # combine the x and y values into (x,y) pairs
+        cluster_points = list(zip(cluster_x, cluster_y))
+        return self._within_cluster(cluster_points, x, y)
+    
+    def _within_cluster(self, cluster_points, x, y):
+        """
+        Check if the new point (x, y) is within the allowed normalized distance
+        from all points in the cluster.
+        
+        :param cluster_points: list of (x, y) pairs.
+        :param x: new x coordinate.
+        :param y: new y coordinate.
+        :return: True if the normalized Euclidean distance for each point is within threshold.
+        """
+        norm_threshold = 0.75
+
+        cluster_x, cluster_y = [p[0] for p in cluster_points], [p[1] for p in cluster_points]
+        mean_x = sum(cluster_x) / len(cluster_x)
+        mean_y = sum(cluster_y) / len(cluster_y)
+        dx = abs(mean_x - x) / self.monitor['width']
+        dy = abs(mean_y - y) / self.monitor['height']
+        norm_diff = np.sqrt(dx**2 + dy**2)
+        return norm_diff <= norm_threshold  # use your chosen threshold
+
+        # alpha, beta = 1.0, 1.0
+        # for cx, cy in cluster_points:
+        #     dx = abs(cx - x) / self.monitor['width']
+        #     dy = abs(cy - y) / self.monitor['height']
+        #     if np.sqrt(alpha * dx**2 + beta * dy**2) > norm_threshold:
+        #         return False
+        # return True
+
+        # for cx, cy in zip(cluster_x, cluster_y):
+        #     if abs(cx - x) > self.max_intra_cluster_dist_x or abs(cy - y) > self.max_intra_cluster_dist_y:
+        #         return False
+        # return True
 
     def _has_consistent_movement(self, values, nb_same):
         """
