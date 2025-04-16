@@ -1,15 +1,23 @@
 """
 gaze_calibration.py
 
-This module contains the GazeCalibration class for mapping the user's gaze
-to screen coordinates. It also includes helper functions to cluster noisy
-calibration measurements.
+This module contains the GazeCalibrationAPI class for mapping the user's gaze
+to screen coordinates. It splits the calibration process into three stages:
+  1. Ratios Calibration Stage (collecting raw eye ratios)
+  2. Distortion Calibration Stage (deriving mapping/distortion coefficients)
+  3. Test Stage (final error estimation)
+These sub‐classes are encapsulated within GazeCalibrationAPI so that external
+dependencies (in PointOfGaze and EPOGAnalyzer) remain unchanged.
 """
 
 import cv2
-import numpy as np
 import logging
-from distortion_calibration import compute_distortion_coefficients
+import numpy as np
+from scipy.optimize import least_squares
+
+COLOR_SCHEME = {'LIGHT': {'bg':255, 'text':(0,0,0)},
+                'DARK': {'bg':0, 'text':(255, 255, 255)}}
+COLOR = COLOR_SCHEME['LIGHT']
 
 class GazeCalibration:
     """
@@ -20,54 +28,42 @@ class GazeCalibration:
     later used to map raw gaze ratios to actual screen coordinates.
     """
 
-    def __init__(self, gaze_tracking, monitor, video_source, record):
+    ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ###
+    # --- Initialization and Configuration --- #
+
+    def __init__(self, gaze_tracking, monitor):
         self.logger = logging.getLogger(__name__)
         self.gaze_tracking = gaze_tracking
-        if video_source or record:
-            debug_errors = True
-        self.errors_dict = {'x': [], 'y': [], 'xy': []}
+        self.monitor = monitor
 
-        # initialize extreme ratio values
-        self.leftmost_hr = 0
-        self.rightmost_hr = 0
-        self.top_vr = 0
-        self.bottom_vr = 0
+        self.errors_dict = {'x': [], 'y': [], 'xy': []}
 
         # set up calibration configuration, counters, and timing parameters
         self._init_counters()
         self._init_iris_measurement()
         self._init_timing_parameters()
-        self._init_fullscreen_frame(monitor)
-        self._init_calibration_grid(monitor)
-        self._init_test_points(monitor, debug_errors)
+        self._init_fullscreen_frame()
+        self._init_calibration_points(extreme_points=True)
+        
+        # this list will store calibration data for each calibration point.
+        # each element is a tuple: (hr, vr, target_x, target_y)
+        self.calibration_ratios = [[] for _ in range(self.num_calibration_points)]
+        self.calibration_data = [[] for _ in range(self.num_calibration_points)]
+        # distortion_data stores a list of raw (x,y) estimates for each calibration point
+        self.distortion_data = [[] for _ in range(self.num_calibration_points)]
 
-    def _init_calibration_grid(self, monitor):
-        self.grid_points = [3, 3]
-        self.num_calib_points, self.calibration_points = self._setup_calibration_points(monitor)
-        self.calibration_ratios = [[] for _ in range(self.num_calib_points)]
-        self.calibration_data = [[] for _ in range(self.num_calib_points)]
+        # new: set initial calibration stage to "ratios"
+        print('\n--- Ratios Calibration Stage ---\n')
+        self.calibration_stage = "ratios"  # stages: "ratios" -> "distortion" -> "test"
+        self.calibration_completed = [False, False, False]  # flags for each stage
 
-    def _init_test_points(self, monitor, debug_errors):
-        if debug_errors:
-            self.test_points = self._generate_test_points(monitor)
-            self.num_test_points = len(self.test_points)
-        else:
-            self.num_test_points = 5
-            self.test_points = self._setup_test_points(monitor)
-
-    def _init_fullscreen_frame(self, monitor):
-        self.circle_radius = 20
-        self.fullscreen_frame = self._create_fullscreen_frame(monitor)
-        self.frame_height, self.frame_width = self.fullscreen_frame.shape[:2]
-
-    def _init_timing_parameters(self):
-        self.instruction_frames = 40
-        self.fixation_frames = 20
-        self.calibration_frames = 40
-        self.test_frames = 40
+        # These will be computed during distortion calibration:
+        self.poly_x = None
+        self.poly_y = None
+        self.distortion_params = None
 
     def _init_counters(self):
-        self.current_calib_point = 0
+        self.current_calibration_point = 0
         self.instruction_frame_count = 0
         self.fixation_frame_count = 0
         self.calibration_frame_count = 0
@@ -78,270 +74,238 @@ class GazeCalibration:
     def _init_iris_measurement(self):
         self.base_iris_size = 0
         self.iris_size_count = 0
-        self.calibration_completed = False
-        self.testing_completed = False
 
-    def _setup_calibration_points(self, monitor):
-        """
-        Compute calibration points evenly distributed over the screen.
+    def _init_timing_parameters(self):
+        self.instruction_frames = 40
+        self.fixation_frames = 20
+        self.calibration_frames = 40
+        self.test_frames = 40
 
-        :param monitor: dict with keys 'width' and 'height'
-        :return: tuple (number_of_points, list_of_points)
-        """
-        width = monitor['width']
-        height = monitor['height']
-        calibration_points = []
-        vertical_points, horizontal_points = self.grid_points
-        step_x = (width - 2 * self.circle_radius) // (horizontal_points - 1)
-        step_y = (height - 2 * self.circle_radius) // (vertical_points - 1)
-        for v in range(vertical_points):
-            for h in range(horizontal_points):
-                x = h * step_x + self.circle_radius
-                y = v * step_y + self.circle_radius
-                calibration_points.append((x, y))
-        return len(calibration_points), np.array(calibration_points)
+    def _init_fullscreen_frame(self):
+        self.circle_radius = 20
+        self.fullscreen_frame = np.zeros((self.monitor['height'], self.monitor['width'], 3), dtype=np.uint8)
+        self.frame_height, self.frame_width = self.fullscreen_frame.shape[:2]
 
-    def _setup_test_points(self, monitor):
-        """
-        Generate random test points on the screen.
+    def _init_calibration_points(self, extreme_points=False):
+        self.calibration_points = self._generate_calibration_points(extreme_points=extreme_points)
+        self.num_calibration_points = len(self.calibration_points)
 
-        :param monitor: dict with keys 'width' and 'height'
-        :return: numpy array of test points.
-        """
-        width = monitor['width']
-        height = monitor['height']
-        min_x = self.circle_radius
-        max_x = width - self.circle_radius
-        min_y = self.circle_radius
-        max_y = height - self.circle_radius
-        test_points = [np.array([np.random.randint(min_x, max_x), np.random.randint(min_y, max_y)])
-                  for _ in range(self.num_test_points)]
-        return np.array(test_points)
-
-    def _generate_test_points(self, monitor, rows=3, cols=3, margin_ratio=0.1):
+    def _generate_calibration_points(self, rows=3, cols=3, margin_ratio=0.1, extreme_points=False):
         """
         deterministically generate test points that are scattered across the screen
         but not at the extreme edges.
         
-        :param monitor: dict with keys 'width' and 'height'
         :param rows: number of rows in the grid
         :param cols: number of columns in the grid
         :param margin_ratio: fraction of width/height to leave as margin from the edges
         :return: numpy array of test points (each as (x, y))
         """
-        width = monitor['width']
-        height = monitor['height']
-        margin_x = margin_ratio * width
-        margin_y = margin_ratio * height
+        width = self.monitor['width']
+        height = self.monitor['height']
 
-        # available space after margins
-        available_width = width - 2 * margin_x
-        available_height = height - 2 * margin_y
+        if extreme_points:
+            margin = self.circle_radius
+            xs = [int(margin + i * ((width - 2 * margin) / (cols - 1))) for i in range(cols)]
+            ys = [int(margin + i * ((height - 2 * margin) / (rows - 1))) for i in range(rows)]
 
-        # compute equally spaced x and y values within the available space
-        xs = [int(margin_x + i * (available_width / (cols - 1))) for i in range(cols)]
-        ys = [int(margin_y + i * (available_height / (rows - 1))) for i in range(rows)]
+        else:
+            margin_x = margin_ratio * width
+            margin_y = margin_ratio * height
+            available_width = width - 2 * margin_x
+            available_height = height - 2 * margin_y
+            xs = [int(margin_x + i * available_width / (cols - 1)) for i in range(cols)]
+            ys = [int(margin_y + i * available_height / (rows - 1)) for i in range(rows)]
 
-        # generate points as all combinations of xs and ys
         points = [(x, y) for y in ys for x in xs]
         return np.array(points)
 
-    def _create_fullscreen_frame(self, monitor):
-        """
-        Create a blank fullscreen frame.
 
-        :param monitor: dict with keys 'width' and 'height'
-        :return: numpy array representing the fullscreen frame.
-        """
-        self.logger.debug(f"Monitor resolution: {monitor['height']} x {monitor['width']}")
-        return np.zeros((monitor['height'], monitor['width'], 3), dtype=np.uint8)
+
+    ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ###
+    # --- Main API Methods --- #
 
     def calibrate_gaze(self, pog):
         """
-        Process the calibration state for each frame.
-
-        This method cycles through multiple phases for each calibration point:
-          1. Instruction phase
-          2. Fixation phase
-          3. Data collection phase
-
-        When all calibration points are processed, finalizes calibration.
+        Process the calibration stage for each frame.
+        Behavior changes based on self.stage:
+          - "ratios": collect raw ratios.
+          - "distortion": collect raw (x,y) estimates.
+          - "test": run the test stage.
         """
         self.pog = pog
-        self.fullscreen_frame.fill(255)
-        if self.current_calib_point < self.num_calib_points:
-            self._handle_calibration_phase()
-        else:
-            self._finalize_calibration()
+        self.fullscreen_frame.fill(COLOR['bg'])
+
+        if self.calibration_stage == "ratios":
+            self._handle_stage_phase(self._record_ratios, self._process_ratios)
+
+            if self.current_calibration_point >= self.num_calibration_points:
+                self.logger.debug("Ratios Calibration complete. Switching to Distortion Calibration Stage.")
+
+                # Reset counters for distortion stage:
+                self.current_calibration_point = 0
+                self.instruction_frame_count = 0
+                self.fixation_frame_count = 0
+                self.calibration_frame_count = 0
+
+                self.compute_polynomial_mapping()  # Use ratios data for initial mapping.
+
+                self.calibration_completed[0] = True
+                self.calibration_stage = "distortion"
+                self._init_calibration_points(extreme_points=False)
+
+        elif self.calibration_stage == "distortion":
+            self._handle_stage_phase(self._record_distortion, self._process_distortion)
+
+            if self.current_calibration_point >= self.num_calibration_points:
+                print('\n--- Distortion Calibration Stage ---\n')
+                self.logger.debug("Distortion Calibration complete. Switching to Test Stage.")
+
+                # Reset counters for test stage:
+                self.current_calibration_point = 0
+                self.instruction_frame_count = 0
+                self.calibration_frame_count = 0
+
+                # distortion_data is now a list of tuples [(x_raw_avg, y_raw_avg, target_x, target_y), ...]
+                self.distortion_params = self.compute_distortion_coefficients()
+                print('Distortion params:', self.distortion_params)
+                self.logger.debug("Distortion coefficients computed: {}".format(self.distortion_params))
+                
+                print('\nNumber of clusters created:', self.pog.get_num_clusters()) # FOR DEBUGGING
+                self.pog.num_clusters = 0 # FOR DEBUGGING
+                self.print_aggregated_errors()
+
+                self.calibration_completed[1] = True
+                self.calibration_stage = "test"
+                self._init_calibration_points(extreme_points=False)
+
+        elif self.calibration_stage == "test":
+            self._handle_stage_phase(self._record_test, self._process_test)
+
+            if self.current_calibration_point >= self.num_calibration_points:
+                print('--- Test Calibration Stage ---\n')
+                self.logger.debug("Test Calibration complete.")
+
+                print('Number of clusters created:', self.pog.get_num_clusters())
+                self.print_aggregated_errors()
+                
+                self.calibration_completed[2] = True
+
         return self.fullscreen_frame
 
-    def _handle_calibration_phase(self):
+    def is_fully_calibrated(self):
         """
-        Handle the current calibration phase:
-          - Instruction phase: display instructions.
-          - Fixation phase: display the fixation point.
-          - Data collection phase: record gaze ratios.
+        Check if all calibration stages are complete.
         """
-        # Phase 1: instruction phase
+        return all(self.calibration_completed)
+
+    # === Common Handler for a Calibration Stage Phase ===
+    def _handle_stage_phase(self, data_collection_func, post_process_func):
+        """
+        A common handler that performs the three phases (instruction, fixation, data collection)
+        for the given calibration stage.
+        
+        Parameters:
+          data_collection_func: a function (with no parameters) that records data for the current frame.
+          post_process_func: an optional function to process the collected data once data collection is complete.
+        """
+
+        # Phase 1: Instruction phase.
         if self.instruction_frame_count < self.instruction_frames:
             self._display_instruction()
             self.instruction_frame_count += 1
             return
 
-        # Phase 2: fixation Phase
+        # Phase 2: Fixation phase.
         if self.fixation_frame_count < self.fixation_frames:
-            self._display_fixation(self.current_calib_point)
+            self._display_fixation(self.current_calibration_point)
             self.fixation_frame_count += 1
             return
 
-        # Phase 3: data collection phase
+        # Phase 3: Data collection phase.
         if self.calibration_frame_count < self.calibration_frames:
-            self._display_fixation(self.current_calib_point)
-            self._record_gaze_data(self.current_calib_point)
+            self._display_fixation(self.current_calibration_point)
+            data_collection_func()  # stage-specific data recording.
             self.calibration_frame_count += 1
             return
 
-        # once the data collection phase is over, process and store the collected ratios.
-        self.calibration_ratios[self.current_calib_point] = GazeCalibration.cluster_calibration_ratios(
-            self.calibration_ratios[self.current_calib_point]
-        )
+        # Once enough frames have been collected for the current calibration point:
+        post_process_func()  # stage-specific post-processing.
         
-        # save final ratios for the current point
-        self.calibration_data[self.current_calib_point] = (*self.calibration_ratios[self.current_calib_point],
-                                                           *self.calibration_points[self.current_calib_point])
-
-        # reset counters for the next calibration point.
-        self.current_calib_point += 1
+        # Then reset counters for this point and advance.
+        self.current_calibration_point += 1
         self.fixation_frame_count = 0
         self.calibration_frame_count = 0
-        self.fl = self.current_calib_point
+        self.fl = self.current_calibration_point
 
-    def _finalize_calibration(self):
-        """
-        Once all calibration points are processed, compute the extreme ratios and finalize iris size.
-        """
-        self._compute_extreme_ratios()
-        if self.iris_size_count > 0: # if no iris measurements were recorded in that frame
-            self.base_iris_size /= self.iris_size_count
-        self.calibration_completed = True
-        self.compute_polynomial_mapping()
+        return
 
-    def _display_instruction(self):
-        """
-        Display calibration instructions on the fullscreen frame.
-        """
-        cv2.putText(
-            self.fullscreen_frame,
-            'focus on the red dots',
-            (80, 200),
-            cv2.FONT_HERSHEY_COMPLEX,
-            1.7,
-            (25),
-            2,
-            cv2.LINE_AA
-        )
-        cv2.putText(
-            self.fullscreen_frame,
-            'click the window to proceed',
-            (80, 300),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1.7,
-            (25),
-            2,
-            cv2.LINE_AA
-        )
 
-    def _display_fixation(self, calib_index):
-        """
-        Display a fixation point (red circle) at the current calibration point.
-        """
-        cv2.circle(
-            self.fullscreen_frame,
-            self.calibration_points[calib_index],
-            self.circle_radius,
-            (0, 0, 255),
-            -1
-        )
+    ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ###
+    # --- Stage-Specific Callback Functions --- #
 
-    def _update_iris_size(self, iris_d):
-        self.base_iris_size += iris_d
-        self.iris_size_count += 1
-
-    def _record_gaze_data(self, calib_index):
-        """
-        Record gaze ratios and (if applicable) iris size for the current calibration point.
-
-        - Records horizontal and vertical ratios if available.
-        - If the current calibration point is the center of the screen,
-          also record the iris diameter.
-        """
+    # For the "ratios" stage:
+    def _record_ratios(self):
         hr = self.gaze_tracking.horizontal_ratio()
         vr = self.gaze_tracking.vertical_ratio()
         
         if hr is not None and vr is not None:
-            self.calibration_ratios[calib_index].append([hr, vr])
+            self.calibration_ratios[self.current_calibration_point].append([hr, vr])
 
         # check if the current calibration point is the center point.
         center_point = [self.frame_width // 2, self.frame_height // 2]
-        if (self.calibration_points[calib_index] == center_point).all():
+        if (self.calibration_points[self.current_calibration_point] == center_point).all():
             iris_diameter = self._measure_iris_diameter()
             if iris_diameter:
                 self._update_iris_size(iris_diameter)
 
-        if self.fl == self.current_calib_point:
-            print('\ncalib p', self.current_calib_point)
+        if self.fl == self.current_calibration_point:
+            print('\ncalib p', self.current_calibration_point)
             print('hr', hr)
             print('vr', vr)
             self.fl = -1
 
-    def _compute_extreme_ratios(self):
-        """
-        Compute the extreme horizontal and vertical ratios from the calibration data.
-        
-        This version precomputes the indices for the edges of the calibration grid
-        and collects the corresponding ratios using list comprehensions.
-        """
-        vertical_points, horizontal_points = self.grid_points
+    def _process_ratios(self):
+        ratios = self.calibration_ratios[self.current_calibration_point]
+        best_ratios = GazeCalibration.cluster_calibration_ratios(ratios)
+        target = self.calibration_points[self.current_calibration_point]
+        # Save the representative ratios together with target coordinates.
+        self.calibration_data[self.current_calibration_point] = (best_ratios[0], best_ratios[1], target[0], target[1])
 
-        # compute indices for each edge:
-        left_edge_indices = [v * horizontal_points for v in range(vertical_points)]
-        right_edge_indices = [v * horizontal_points + (horizontal_points - 1) for v in range(vertical_points)]
-        top_edge_indices = list(range(horizontal_points))
-        bottom_edge_indices = list(range((vertical_points - 1) * horizontal_points, vertical_points * horizontal_points))
-        
-        # gather the ratios (if a given calibration point exists, i.e. non-empty)
-        left_ratios = [self.calibration_ratios[idx][0] for idx in left_edge_indices
-                       if self.calibration_ratios[idx]]
-        right_ratios = [self.calibration_ratios[idx][0] for idx in right_edge_indices
-                        if self.calibration_ratios[idx]]
-        top_ratios = [self.calibration_ratios[idx][1] for idx in top_edge_indices
-                      if self.calibration_ratios[idx]]
-        bottom_ratios = [self.calibration_ratios[idx][1] for idx in bottom_edge_indices
-                         if self.calibration_ratios[idx]]
-        
-        # Fallbacks in case any list is empty (adjust as needed)
-        if not left_ratios:
-            left_ratios = [0.0]
-        if not right_ratios:
-            right_ratios = [1.0]
-        if not top_ratios:
-            top_ratios = [0.0]
-        if not bottom_ratios:
-            bottom_ratios = [1.0]
-        
-        # cluster the collected ratios using the density-based approach
-        self.leftmost_hr = GazeCalibration.density_cluster_1d(left_ratios)
-        self.rightmost_hr = GazeCalibration.density_cluster_1d(right_ratios)
-        self.top_vr = GazeCalibration.density_cluster_1d(top_ratios)
-        self.bottom_vr = GazeCalibration.density_cluster_1d(bottom_ratios)
-        
-        self.logger.debug(
-            f"Extreme ratios computed: left {self.leftmost_hr}, right {self.rightmost_hr}, "
-            f"top {self.top_vr}, bottom {self.bottom_vr}"
-        )
+    # For the "distortion" stage:
+    def _record_distortion(self):
+        raw = self.pog.point_of_gaze()  # using current mapping
+        self._display_estimated_gaze(raw)
+        if raw is not None:
+            self.distortion_data[self.current_calibration_point].append(raw)
+            # Optionally record error at each frame:
+            self._record_error(raw)
+
+    def _process_distortion(self):
+        if self.distortion_data[self.current_calibration_point]:
+            avg_x = np.median([pt[0] for pt in self.distortion_data[self.current_calibration_point]])
+            avg_y = np.median([pt[1] for pt in self.distortion_data[self.current_calibration_point]])
+            target = self.calibration_points[self.current_calibration_point]
+            # Store as a tuple: (avg_raw_x, avg_raw_y, target_x, target_y)
+            self.distortion_data[self.current_calibration_point] = (avg_x, avg_y, target[0], target[1])
+            
+    # For the "test" stage:
+    def _record_test(self):
+        raw = self.pog.point_of_gaze()
+        corrected = self._undistort_feature(*raw) if raw is not None else (None, None)
+        self._display_estimated_gaze(corrected)
+        self._record_error(corrected)
+
+    def _process_test(self):
+        # For test stage, no additional processing is required; data is recorded per frame.
+        pass
+
+
+
+    ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ###
+    # --- Calibration Data Processing Functions --- #
 
     def compute_polynomial_mapping(self):
-        # Assume self.calibration_data is a list of tuples [(hr, vr, x, y), ...]
+        # Assume calibration_data is a list of tuples [(hr, vr, x, y), ...]
         data = np.array(self.calibration_data)
         hr = data[:, 0]
         vr = data[:, 1]
@@ -355,105 +319,9 @@ class GazeCalibration:
         self.poly_x = np.linalg.lstsq(A, x_values, rcond=None)[0]
         self.poly_y = np.linalg.lstsq(A, y_values, rcond=None)[0]
 
-    @staticmethod
-    def density_cluster_1d(data):
-        """
-        Determine the best value from a series of noisy measurements using a density-based approach.
-        Computes histograms an array of measurements and selects the bin with the highest frequency as the best estimate
-
-        :param data: list of measurement values.
-        :return: best estimated value.
-        """
-        hist, bins = np.histogram(data, bins='auto')
-        idx = int(np.argmax(hist))
-        return (bins[idx] + bins[idx + 1]) / 2
-
-    @staticmethod
-    def cluster_calibration_ratios(ratios):
-        """
-        Cluster the calibration ratios for a single calibration point.
-
-        :param ratios: list of [horizontal_ratio, vertical_ratio] pairs.
-        :return: list containing [best_horizontal_ratio, best_vertical_ratio].
-
-        This function uses a simple density-based approach to determine the most frequent values.
-        It extracts horizontal and vertical ratios from the collected data.
-        """
-        if not ratios:
-            return None
-        # extract horizontal and vertical values from each pair.
-        horizontal_values = np.array([pair[0] for pair in ratios], dtype=np.float64)
-        vertical_values = np.array([pair[1] for pair in ratios], dtype=np.float64)
-        best_horizontal = GazeCalibration.density_cluster_1d(horizontal_values)
-        best_vertical = GazeCalibration.density_cluster_1d(vertical_values)
-        return [best_horizontal, best_vertical]
-
-    def test_gaze(self, pog):
-        """
-        process the test phase for each frame.
-        
-        this method displays test points, the estimated gaze,
-        and records errors for evaluation of calibration accuracy.
-        once all test points have been processed, it prints aggregated errors.
-        
-        :param pog: the PointOfGaze object used for gaze estimation.
-        :return: the fullscreen frame with test overlays.
-        """
-        self.pog = pog
-        self.fullscreen_frame.fill(255)
-        
-        if self.test_point_index < self.num_test_points:
-            self._handle_test_phase()
-        else:
-            self.testing_completed = True
-            self.print_aggregated_errors()
-        
-        return self.fullscreen_frame
-
-    def _handle_test_phase(self):
-        """
-        handle the test phase for the current test point.
-        
-        during the test phase, display the test point and estimated gaze
-        for a fixed number of frames. after that, record the error for the 
-        current test point, advance to the next test point, and reset the frame count.
-        """
-        if self.test_frame_count < self.test_frames:
-            self._display_test_point(self.test_point_index)
-            self._display_estimated_gaze()  # this method draws the gaze dot and logs errors if needed
-            self.test_frame_count += 1
-        else:
-            self.test_point_index += 1
-            self.test_frame_count = 0
-
-    def _display_test_point(self, test_index):
-        """
-        Draw the test point (red circle) on the fullscreen frame.
-        """
-        cv2.circle(
-            self.fullscreen_frame,
-            tuple(self.test_points[test_index]),
-            self.circle_radius,
-            (0, 0, 255),
-            -1
-        )
-
-    def _display_estimated_gaze(self):
-        """
-        Obtain the estimated gaze from the PointOfGaze object and display it.
-
-        The gaze is shown as a small light-gray dot.
-        """
-        est_x, est_y = self._record_error()
-
-        if est_x is not None and est_y is not None:
-            cv2.circle(
-                self.fullscreen_frame,
-                (est_x, est_y),
-                self.circle_radius // 4,
-                (170, 170, 170),
-                -1
-            )
+    def _update_iris_size(self, iris_d):
+        self.base_iris_size += iris_d
+        self.iris_size_count += 1
 
     def _measure_iris_diameter(self):
         """
@@ -502,18 +370,220 @@ class GazeCalibration:
             return diameter_right * 2
         return (diameter_right + diameter_left) / 2
 
-    def is_completed(self):
+    @staticmethod
+    def density_cluster_1d(data):
         """
-        Check if the calibration process is completed.
-        """
-        return self.calibration_completed
+        Determine the best value from a series of noisy measurements using a density-based approach.
+        Computes histograms an array of measurements and selects the bin with the highest frequency as the best estimate
 
-    def is_tested(self):
+        :param data: list of measurement values.
+        :return: best estimated value.
         """
-        Check if the gaze testing phase is completed.
+        hist, bins = np.histogram(data, bins='auto')
+        idx = int(np.argmax(hist))
+        return (bins[idx] + bins[idx + 1]) / 2
+
+    @staticmethod
+    def cluster_calibration_ratios(ratios):
         """
-        return self.testing_completed
+        Cluster the calibration ratios for a single calibration point.
+
+        :param ratios: list of [horizontal_ratio, vertical_ratio] pairs.
+        :return: list containing [best_horizontal_ratio, best_vertical_ratio].
+
+        This function uses a simple density-based approach to determine the most frequent values.
+        It extracts horizontal and vertical ratios from the collected data.
+        """
+        if not ratios:
+            return None
+        # extract horizontal and vertical values from each pair.
+        horizontal_values = np.array([pair[0] for pair in ratios], dtype=np.float64)
+        vertical_values = np.array([pair[1] for pair in ratios], dtype=np.float64)
+        best_horizontal = GazeCalibration.density_cluster_1d(horizontal_values)
+        best_vertical = GazeCalibration.density_cluster_1d(vertical_values)
+        return [best_horizontal, best_vertical]
+
+
+
+    ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ###
+    # --- Distortion Calibration Functions --- #
+
+    @staticmethod
+    def distortion_model(params, x_norm, y_norm):
+        """
+        Given distortion parameters and normalized coordinates, compute the undistorted coordinates.
+        params: array of 9 parameters [k1, k2, k3, p1, p2, s1, s2, s3, s4]
+        where:
+        k1, k2, k3: radial distortion coefficients,
+        p1, p2: tangential distortion coefficients,
+        s1, s2, s3, s4: prism distortion coefficients.
+        """
+        k1, k2, k3, p1, p2, s1, s2, s3, s4 = params
+        p1, p2, k2, k3 = 0, 0, 0, 0
+        
+        # Compute the radial distance
+        r = np.sqrt(x_norm**2 + y_norm**2)
+        
+        # Radial distortion factor (ρ)
+        rho = 1 + k1 * r**2 + k2 * r**4 + k3 * r**6
+        
+        # Tangential distortion components (τ)
+        tau_x = 2 * p1 * x_norm * y_norm + p2 * (r**2 + 2 * x_norm**2)
+        tau_y = p1 * (r**2 + 2 * y_norm**2) + 2 * p2 * x_norm * y_norm
+        
+        # Prism distortion components (φ)
+        phi_x = s1 * r**2 + s2 * r**4
+        phi_y = s3 * r**2 + s4 * r**4
+        
+        # Apply the distortion model: corrected normalized coordinates
+        x_corr = x_norm * rho + tau_x + phi_x
+        y_corr = y_norm * rho + tau_y + phi_y
+        
+        return x_corr, y_corr
+
+    @staticmethod
+    def residuals(params, x_norm, y_norm, x_target, y_target):
+        """
+        Compute the residuals between the model's corrected normalized coordinates and the target normalized coordinates.
+        """
+
+        x_corr, y_corr = GazeCalibration.distortion_model(params, x_norm, y_norm)
+        
+        # Concatenate residuals for x and y into a single vector
+        return np.concatenate([(x_corr - x_target), (y_corr - y_target)])
+
+    def compute_distortion_coefficients(self):
+        """
+        Compute distortion coefficients from calibration data.
+        
+        Parameters:
+            calibration_data: list of tuples [(x_raw, y_raw, x_target, y_target), ...]
+                - x_raw, y_raw: raw coordinates from your polynomial mapping (before undistortion)
+                - x_target, y_target: the actual screen coordinates for that calibration point.
+            frame_width: screen width in pixels.
+            frame_height: screen height in pixels.
+        
+        The function normalizes both raw and target coordinates to [-1, 1] using the screen center.
+        
+        Returns:
+            params: the estimated distortion coefficients as a numpy array:
+                    [k1, k2, k3, p1, p2, s1, s2, s3, s4]
+        """
+
+        data = np.array(self.distortion_data)
+        x_raw = data[:, 0]
+        y_raw = data[:, 1]
+        x_target = data[:, 2]
+        y_target = data[:, 3]
+        
+        # Normalize: using screen center and half dimensions to map to [-1, 1]
+        x_norm = (x_raw - self.frame_width / 2) / (self.frame_width / 2)
+        y_norm = (y_raw - self.frame_height / 2) / (self.frame_height / 2)
+        x_target_norm = (x_target - self.frame_width / 2) / (self.frame_width / 2)
+        y_target_norm = (y_target - self.frame_height / 2) / (self.frame_height / 2)
+        
+        # Initial guess for parameters
+        initial_guess = np.array([-0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        
+        # Run least squares optimization to find the distortion parameters
+        result = least_squares(
+            GazeCalibration.residuals, 
+            initial_guess, 
+            args=(x_norm, y_norm, x_target_norm, y_target_norm)
+        )
+
+        return result.x
     
+    def _undistort_feature(self, x, y):
+        """
+        Correct the raw gaze coordinates (x,y) using the computed distortion coefficients.
+        The coordinates are first normalized to [-1, 1] (with the screen center as 0,0),
+        then passed through the distortion_model, and finally mapped back to screen coordinates.
+        """
+        # Convert raw coordinates to normalized coordinates.
+        x_norm = (x - self.frame_width / 2) / (self.frame_width / 2)
+        y_norm = (y - self.frame_height / 2) / (self.frame_height / 2)
+        
+        # Apply the distortion model using the computed coefficients.
+        # Ensure self.distortion_params is available.
+        if self.distortion_params is None:
+            # If not available, return raw coordinates.
+            return x, y
+        x_corr_norm, y_corr_norm = GazeCalibration.distortion_model(self.distortion_params, x_norm, y_norm)
+        
+        # Map normalized coordinates back to screen coordinates.
+        x_corr = x_corr_norm * (self.frame_width / 2) + self.frame_width / 2
+        y_corr = y_corr_norm * (self.frame_height / 2) + self.frame_height / 2
+        return int(x_corr), int(y_corr)
+
+
+
+    ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### 
+    # --- Public Helper Functions (display, record, errors) --- #
+
+    def _display_instruction(self):
+        """
+        Display instructions on the fullscreen frame.
+        """
+        
+        if self.calibration_stage == 'ratios':
+            text = 'Ratios Calibration Stage'
+        elif self.calibration_stage == 'distortion':
+            text = 'Distortion Calibration Stage'
+        elif self.calibration_stage == 'test':
+            text = 'Test Calibration Stage'
+
+        cv2.putText(
+            self.fullscreen_frame,
+            text,
+            (80, 200),
+            cv2.FONT_HERSHEY_COMPLEX,
+            1.7,
+            (COLOR['text']),
+            2,
+            cv2.LINE_AA
+        )
+
+        cv2.putText(
+            self.fullscreen_frame,
+            'focus on the red dots',
+            (80, 300),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.7,
+            (COLOR['text']),
+            2,
+            cv2.LINE_AA
+        )
+
+    def _display_fixation(self, calibration_index):
+        """
+        Display a fixation point (red circle) at the current calibration point.
+        """
+        cv2.circle(
+            self.fullscreen_frame,
+            self.calibration_points[calibration_index],
+            self.circle_radius,
+            (0, 0, 255),
+            -1
+        )
+
+    def _display_estimated_gaze(self, raw):
+        """
+        Obtain the estimated gaze from the PointOfGaze object and display it.
+
+        The gaze is shown as a small light-gray dot.
+        """
+        est_x, est_y = raw
+
+        if est_x is not None and est_y is not None:
+            cv2.circle(
+                self.fullscreen_frame,
+                (est_x, est_y),
+                self.circle_radius // 4,
+                (170, 170, 170),
+                -1
+            )
+
     def _calculate_error(self, screen_x, screen_y):
         """
         calculate and log the error between the estimated gaze coordinates and a target point.
@@ -522,7 +592,7 @@ class GazeCalibration:
         :param screen_y: estimated gaze y coordinate.
         :return: tuple (err_x, err_y, err_xy) representing the error in x, error in y, and Euclidean error.
         """
-        target_point = self.test_points[self.test_point_index]
+        target_point = self.calibration_points[self.test_point_index]
         target_point = np.asarray(target_point)
         
         err_x = screen_x - target_point[0]
@@ -532,22 +602,20 @@ class GazeCalibration:
         self.errors_dict['x'].append(err_x)
         self.errors_dict['y'].append(err_y)
         self.errors_dict['xy'].append(err_xy)
-        
-        # print(f"Error calculated: err_x={err_x}, err_y={err_y}, err_xy={err_xy}")
-            
-    def _record_error(self):
+                    
+    def _record_error(self, raw):
         """
         display the estimated gaze and record the error relative to a target point.
         
         the function draws a small light-gray dot at the estimated gaze and then calls
         calculate_error() to compute and record the error.
         """
-        est_x, est_y = self.pog.point_of_gaze()
+        est_x, est_y = raw
         if est_x is None or est_y is None:
             return  # nothing to display or record
         
         # record the error using the common calculation function
-        # this function will use self.test_points (or self.calibration_points) based on mode
+        # this function will use self.calibration_points (or self.calibration_points) based on mode
         self._calculate_error(est_x, est_y)
 
         return est_x, est_y
