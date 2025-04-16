@@ -28,12 +28,11 @@ class EPOGAnalyzer:
         self.windows_closed = False
 
         # initialize gaze tracking using mediapipe
-        self.gaze_tr = GazeTracking()
+        self.gaze_tracking = GazeTracking()
 
         # initialize calibration and point-of-gaze objects
-        self.gaze_calib = GazeCalibration(self.gaze_tr, self.monitor, 
-                                          self.video_source, self.record)
-        self.pog = PointOfGaze(self.gaze_tr, self.gaze_calib, self.monitor, self.stabilize)
+        self.gaze_calibration = GazeCalibration(self.gaze_tracking, self.monitor)
+        self.pog = PointOfGaze(self.gaze_tracking, self.gaze_calibration, self.monitor, self.stabilize)
 
         if self.record:  # or use 'XVID', 'H264', etc.
             _fps = 30.0
@@ -83,54 +82,39 @@ class EPOGAnalyzer:
             if self.video_writer:
                 self.video_writer.write(frame)
 
-            _, _ = self.analyze(frame)
-                # if done with both calibration and testing, or ESC pressed, break
-            if self.gaze_calib.is_completed() and self.gaze_calib.is_tested():
-                break
-
+            self.analyze(frame)
+            
+            # if done with both calibration and testing, or ESC pressed, break
             # check for escape key (27) -- mask low-order bits for compatibility
-            if cv2.waitKey(1) & 0xFF == 27:
+            if self.gaze_calibration.is_fully_calibrated() or cv2.waitKey(1) & 0xFF == 27:
                 break
 
         self.webcam.release()
+
         if self.video_writer:
             self.video_writer.release()
+
         cv2.destroyAllWindows()
 
     def analyze(self, frame):
         """
-        analyze a webcam frame by refreshing gaze tracking and updating the
-        calibration or test phase.
-
-        :param frame: image frame from the webcam.
-        :return: tuple (screen_x, screen_y) if calibration and testing are complete;
-                otherwise, (None, None)
-        """
-        # refresh and analyze the current frame for gaze data
-        self.gaze_tr.refresh(frame)
+        Analyze a webcam frame by refreshing gaze tracking and processing the
+        calibration (or test) stages. Until calibration (including test) is complete,
+        this function returns None, None after displaying the appropriate calibration frame.
+        Once the entire calibration is complete, it returns the final gaze point.
         
-        # always ensure the calibration window is sized to the monitor
+        :param frame: image frame from the webcam.
+        :return: tuple (screen_x, screen_y) if fully calibrated; otherwise, (None, None)
+        """
+        # Refresh the gaze tracking data.
+        self.gaze_tracking.refresh(frame)
+        
+        # Ensure the calibration window is properly resized.
         cv2.resizeWindow(self.calib_window, self.monitor['width'], self.monitor['height'])
         
-        # if calibration is not complete, update the window position and show the calibration frame
-        if not self.gaze_calib.is_completed():
-            self._update_calib_window_position()
-            calib_frame = self.gaze_calib.calibrate_gaze(self.pog)
-            cv2.imshow(self.calib_window, calib_frame)
-            return None, None
-        
-        # if calibration is complete but testing is not, show the test frame
-        if not self.gaze_calib.is_tested():
-            calib_frame = self.gaze_calib.test_gaze(self.pog)
-            cv2.imshow(self.calib_window, calib_frame)
-            return None, None
-        
-        # if both calibration and testing are complete, close the calibration window (if not already done)
-        if not self.windows_closed:
-            self._close_calib_window()
-        
-        # get the final gaze point
-        return True, True
+        # Run the unified calibration routine.
+        calib_frame = self.gaze_calibration.calibrate_gaze(self.pog)
+        cv2.imshow(self.calib_window, calib_frame)
 
     def _update_calib_window_position(self):
         """
