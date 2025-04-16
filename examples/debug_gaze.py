@@ -25,8 +25,10 @@ def main(play_video_test=False, stabilize_gaze=True):
     :param stabilize_gaze: if true, enable gaze stabilization in the analyzer.
     """
     # create an epog analyzer instance with gaze stabilization enabled/disabled
-    epog_analyzer = EPOGAnalyzer(stabilize=stabilize_gaze, video_source=TEST_WEBCAM, record=False) #TEST_WEBCAM #None
-    
+
+    epog_analyzer = EPOGAnalyzer(stabilize=stabilize_gaze, video_source=TEST_WEBCAM, record=False)
+    # epog_analyzer = EPOGAnalyzer(stabilize=stabilize_gaze, video_source=None, record=True)
+
     # perform calibration using the webcam
     epog_analyzer.perform_calibration()
 
