@@ -92,8 +92,8 @@ class GazeTracking:
         if self.pupils_located:
             left_ratio = self.eye_left.get_horizontal_ratio()
             right_ratio = self.eye_right.get_horizontal_ratio()
-            # left_ratio = self.eye_left.pupil.y / (2 * self.eye_left.center[1])
-            # right_ratio = self.eye_right.pupil.y / (2 * self.eye_right.center[1])
+            # left_ratio = self.eye_left.pupil.x / (2 * self.eye_left.center[0])
+            # right_ratio = self.eye_right.pupil.x / (2 * self.eye_right.center[0])
             return (left_ratio + right_ratio) / 2
         return None
 
