@@ -2,10 +2,9 @@
 gaze_calibration.py
 
 This module contains the GazeCalibrationAPI class for mapping the user's gaze
-to screen coordinates. It splits the calibration process into three stages:
+to screen coordinates. It splits the calibration process into two stages:
   1. Ratios Calibration Stage (collecting raw eye ratios)
-  2. Distortion Calibration Stage (deriving mapping/distortion coefficients)
-  3. Test Stage (final error estimation)
+  2. Test Stage (final error estimation)
 These sub‐classes are encapsulated within GazeCalibrationAPI so that external
 dependencies (in PointOfGaze and EPOGAnalyzer) remain unchanged.
 """
@@ -13,7 +12,6 @@ dependencies (in PointOfGaze and EPOGAnalyzer) remain unchanged.
 import cv2
 import logging
 import numpy as np
-from scipy.optimize import least_squares
 
 COLOR_SCHEME = {'LIGHT': {'bg':255, 'text':(0,0,0)},
                 'DARK': {'bg':0, 'text':(255, 255, 255)}}
@@ -49,18 +47,11 @@ class GazeCalibration:
         # each element is a tuple: (hr, vr, target_x, target_y)
         self.calibration_ratios = [[] for _ in range(self.num_calibration_points)]
         self.calibration_data = [[] for _ in range(self.num_calibration_points)]
-        # distortion_data stores a list of raw (x,y) estimates for each calibration point
-        self.distortion_data = [[] for _ in range(self.num_calibration_points)]
 
         # new: set initial calibration stage to "ratios"
         print('\n--- Ratios Calibration Stage ---\n')
-        self.calibration_stage = "ratios"  # stages: "ratios" -> "distortion" -> "test"
-        self.calibration_completed = [False, False, False]  # flags for each stage
-
-        # These will be computed during distortion calibration:
-        self.poly_x = None
-        self.poly_y = None
-        self.distortion_params = None
+        self.calibration_stage = "ratios"  # stages: "ratios" -> "test"
+        self.calibration_completed = [False, False]  # flags for each stage
 
     def _init_counters(self):
         self.current_calibration_point = 0
@@ -129,7 +120,6 @@ class GazeCalibration:
         Process the calibration stage for each frame.
         Behavior changes based on self.stage:
           - "ratios": collect raw ratios.
-          - "distortion": collect raw (x,y) estimates.
           - "test": run the test stage.
         """
         self.pog = pog
@@ -139,9 +129,9 @@ class GazeCalibration:
             self._handle_stage_phase(self._record_ratios, self._process_ratios)
 
             if self.current_calibration_point >= self.num_calibration_points:
-                self.logger.debug("Ratios Calibration complete. Switching to Distortion Calibration Stage.")
+                self.logger.debug("Ratios Calibration complete. Switching to Test Calibration Stage.")
 
-                # Reset counters for distortion stage:
+                # Reset counters for test stage:
                 self.current_calibration_point = 0
                 self.instruction_frame_count = 0
                 self.fixation_frame_count = 0
@@ -150,31 +140,6 @@ class GazeCalibration:
                 self.compute_polynomial_mapping()  # Use ratios data for initial mapping.
 
                 self.calibration_completed[0] = True
-                self.calibration_stage = "distortion"
-                self._init_calibration_points(extreme_points=False)
-
-        elif self.calibration_stage == "distortion":
-            self._handle_stage_phase(self._record_distortion, self._process_distortion)
-
-            if self.current_calibration_point >= self.num_calibration_points:
-                print('\n--- Distortion Calibration Stage ---\n')
-                self.logger.debug("Distortion Calibration complete. Switching to Test Stage.")
-
-                # Reset counters for test stage:
-                self.current_calibration_point = 0
-                self.instruction_frame_count = 0
-                self.calibration_frame_count = 0
-
-                # distortion_data is now a list of tuples [(x_raw_avg, y_raw_avg, target_x, target_y), ...]
-                self.distortion_params = self.compute_distortion_coefficients()
-                print('Distortion params:', self.distortion_params)
-                self.logger.debug("Distortion coefficients computed: {}".format(self.distortion_params))
-                
-                print('\nNumber of clusters created:', self.pog.get_num_clusters()) # FOR DEBUGGING
-                self.pog.num_clusters = 0 # FOR DEBUGGING
-                self.print_aggregated_errors()
-
-                self.calibration_completed[1] = True
                 self.calibration_stage = "test"
                 self._init_calibration_points(extreme_points=False)
 
@@ -188,7 +153,7 @@ class GazeCalibration:
                 print('Number of clusters created:', self.pog.get_num_clusters())
                 self.print_aggregated_errors()
                 
-                self.calibration_completed[2] = True
+                self.calibration_completed[1] = True
 
         return self.fullscreen_frame
 
@@ -270,30 +235,12 @@ class GazeCalibration:
         target = self.calibration_points[self.current_calibration_point]
         # Save the representative ratios together with target coordinates.
         self.calibration_data[self.current_calibration_point] = (best_ratios[0], best_ratios[1], target[0], target[1])
-
-    # For the "distortion" stage:
-    def _record_distortion(self):
-        raw = self.pog.point_of_gaze()  # using current mapping
-        self._display_estimated_gaze(raw)
-        if raw is not None:
-            self.distortion_data[self.current_calibration_point].append(raw)
-            # Optionally record error at each frame:
-            self._record_error(raw)
-
-    def _process_distortion(self):
-        if self.distortion_data[self.current_calibration_point]:
-            avg_x = np.median([pt[0] for pt in self.distortion_data[self.current_calibration_point]])
-            avg_y = np.median([pt[1] for pt in self.distortion_data[self.current_calibration_point]])
-            target = self.calibration_points[self.current_calibration_point]
-            # Store as a tuple: (avg_raw_x, avg_raw_y, target_x, target_y)
-            self.distortion_data[self.current_calibration_point] = (avg_x, avg_y, target[0], target[1])
             
     # For the "test" stage:
     def _record_test(self):
         raw = self.pog.point_of_gaze()
-        corrected = self._undistort_feature(*raw) if raw is not None else (None, None)
-        self._display_estimated_gaze(corrected)
-        self._record_error(corrected)
+        self._display_estimated_gaze(raw)
+        self._record_error(raw)
 
     def _process_test(self):
         # For test stage, no additional processing is required; data is recorded per frame.
@@ -405,119 +352,6 @@ class GazeCalibration:
 
 
 
-    ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ###
-    # --- Distortion Calibration Functions --- #
-
-    @staticmethod
-    def distortion_model(params, x_norm, y_norm):
-        """
-        Given distortion parameters and normalized coordinates, compute the undistorted coordinates.
-        params: array of 9 parameters [k1, k2, k3, p1, p2, s1, s2, s3, s4]
-        where:
-        k1, k2, k3: radial distortion coefficients,
-        p1, p2: tangential distortion coefficients,
-        s1, s2, s3, s4: prism distortion coefficients.
-        """
-        k1, k2, k3, p1, p2, s1, s2, s3, s4 = params
-        p1, p2, k2, k3 = 0, 0, 0, 0
-        
-        # Compute the radial distance
-        r = np.sqrt(x_norm**2 + y_norm**2)
-        
-        # Radial distortion factor (ρ)
-        rho = 1 + k1 * r**2 + k2 * r**4 + k3 * r**6
-        
-        # Tangential distortion components (τ)
-        tau_x = 2 * p1 * x_norm * y_norm + p2 * (r**2 + 2 * x_norm**2)
-        tau_y = p1 * (r**2 + 2 * y_norm**2) + 2 * p2 * x_norm * y_norm
-        
-        # Prism distortion components (φ)
-        phi_x = s1 * r**2 + s2 * r**4
-        phi_y = s3 * r**2 + s4 * r**4
-        
-        # Apply the distortion model: corrected normalized coordinates
-        x_corr = x_norm * rho + tau_x + phi_x
-        y_corr = y_norm * rho + tau_y + phi_y
-        
-        return x_corr, y_corr
-
-    @staticmethod
-    def residuals(params, x_norm, y_norm, x_target, y_target):
-        """
-        Compute the residuals between the model's corrected normalized coordinates and the target normalized coordinates.
-        """
-
-        x_corr, y_corr = GazeCalibration.distortion_model(params, x_norm, y_norm)
-        
-        # Concatenate residuals for x and y into a single vector
-        return np.concatenate([(x_corr - x_target), (y_corr - y_target)])
-
-    def compute_distortion_coefficients(self):
-        """
-        Compute distortion coefficients from calibration data.
-        
-        Parameters:
-            calibration_data: list of tuples [(x_raw, y_raw, x_target, y_target), ...]
-                - x_raw, y_raw: raw coordinates from your polynomial mapping (before undistortion)
-                - x_target, y_target: the actual screen coordinates for that calibration point.
-            frame_width: screen width in pixels.
-            frame_height: screen height in pixels.
-        
-        The function normalizes both raw and target coordinates to [-1, 1] using the screen center.
-        
-        Returns:
-            params: the estimated distortion coefficients as a numpy array:
-                    [k1, k2, k3, p1, p2, s1, s2, s3, s4]
-        """
-
-        data = np.array(self.distortion_data)
-        x_raw = data[:, 0]
-        y_raw = data[:, 1]
-        x_target = data[:, 2]
-        y_target = data[:, 3]
-        
-        # Normalize: using screen center and half dimensions to map to [-1, 1]
-        x_norm = (x_raw - self.frame_width / 2) / (self.frame_width / 2)
-        y_norm = (y_raw - self.frame_height / 2) / (self.frame_height / 2)
-        x_target_norm = (x_target - self.frame_width / 2) / (self.frame_width / 2)
-        y_target_norm = (y_target - self.frame_height / 2) / (self.frame_height / 2)
-        
-        # Initial guess for parameters
-        initial_guess = np.array([-0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        
-        # Run least squares optimization to find the distortion parameters
-        result = least_squares(
-            GazeCalibration.residuals, 
-            initial_guess, 
-            args=(x_norm, y_norm, x_target_norm, y_target_norm)
-        )
-
-        return result.x
-    
-    def _undistort_feature(self, x, y):
-        """
-        Correct the raw gaze coordinates (x,y) using the computed distortion coefficients.
-        The coordinates are first normalized to [-1, 1] (with the screen center as 0,0),
-        then passed through the distortion_model, and finally mapped back to screen coordinates.
-        """
-        # Convert raw coordinates to normalized coordinates.
-        x_norm = (x - self.frame_width / 2) / (self.frame_width / 2)
-        y_norm = (y - self.frame_height / 2) / (self.frame_height / 2)
-        
-        # Apply the distortion model using the computed coefficients.
-        # Ensure self.distortion_params is available.
-        if self.distortion_params is None:
-            # If not available, return raw coordinates.
-            return x, y
-        x_corr_norm, y_corr_norm = GazeCalibration.distortion_model(self.distortion_params, x_norm, y_norm)
-        
-        # Map normalized coordinates back to screen coordinates.
-        x_corr = x_corr_norm * (self.frame_width / 2) + self.frame_width / 2
-        y_corr = y_corr_norm * (self.frame_height / 2) + self.frame_height / 2
-        return int(x_corr), int(y_corr)
-
-
-
     ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### --- ### 
     # --- Public Helper Functions (display, record, errors) --- #
 
@@ -528,8 +362,6 @@ class GazeCalibration:
         
         if self.calibration_stage == 'ratios':
             text = 'Ratios Calibration Stage'
-        elif self.calibration_stage == 'distortion':
-            text = 'Distortion Calibration Stage'
         elif self.calibration_stage == 'test':
             text = 'Test Calibration Stage'
 
