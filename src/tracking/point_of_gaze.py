@@ -9,25 +9,20 @@ class PointOfGaze:
     """
 
     def __init__(self, gaze_tracking, gaze_calibration, monitor, stabilize=False):
-        """
-        initialize the point-of-gaze object.
-
-        :param gaze_tracking: gaze tracking object containing detected eye/iris info.
-        :param gaze_calibration: calibration object with baseline iris size and extreme gaze ratios.
-        :param monitor: dict with monitor dimensions, e.g. {'width': ..., 'height': ...}
-        :param stabilize: boolean flag; if true, estimated gaze coordinates are stabilized.
-        """
+        
         self.logger = logging.getLogger(__name__)
         self.gaze_tracking = gaze_tracking
         self.gaze_calibration = gaze_calibration
         self.stabilize = stabilize
+
+        if not isinstance(monitor, dict) or 'width' not in monitor or 'height' not in monitor:
+             raise ValueError("PointOfGaze requires a valid monitor dictionary {'width': W, 'height': H}")
         self.monitor = monitor
 
         # split initialization into meaningful subfunctions
         self._init_cluster_parameters()
         self._init_cluster_storage()
         self._init_movement_flags()
-        # note: iris size is set externally from calibration
 
     def _init_cluster_parameters(self):
         """
@@ -75,47 +70,48 @@ class PointOfGaze:
         if self.stabilize:
             return self._stabilize_point(raw_x, raw_y)
 
-        self._update_iris_on_centered_gaze(raw_x, raw_y)
         return raw_x, raw_y
-
-    def _update_iris_on_centered_gaze(self, raw_x, raw_y):
-        """
-        refresh the stored iris measurement when the gaze is centered.
-        this is based on the assumption that the iris diameter is most accurately measured
-        when the user is looking straight ahead.
-        """
-        if self.looking_straight_ahead(raw_x, raw_y, self.gaze_calibration):
-            self.current_iris_size = self.gaze_calibration._measure_iris_diameter()
-            self.logger.debug(f'iris updated to {self.current_iris_size}')
 
     def _compute_raw_gaze(self):
         if not self.gaze_tracking.pupils_located:
             print('Pupils are not located')
             return None
 
-        if getattr(self, 'current_iris_size', None) in [None, 0]:
-            self.current_iris_size = self.gaze_calibration.base_iris_size
-            self.logger.debug(f'iris set to baseline {self.current_iris_size}')
-
         hr = self.gaze_tracking.horizontal_ratio()
         vr = self.gaze_tracking.vertical_ratio()
 
-        raw_x = (self.gaze_calibration.poly_x[0] * hr**2 +
-                self.gaze_calibration.poly_x[1] * vr**2 +
-                self.gaze_calibration.poly_x[2] * hr * vr +
-                self.gaze_calibration.poly_x[3] * hr +
-                self.gaze_calibration.poly_x[4] * vr +
-                self.gaze_calibration.poly_x[5])
-        
-        raw_y = (self.gaze_calibration.poly_y[0] * hr**2 +
-                self.gaze_calibration.poly_y[1] * vr**2 +
-                self.gaze_calibration.poly_y[2] * hr * vr +
-                self.gaze_calibration.poly_y[3] * hr +
-                self.gaze_calibration.poly_y[4] * vr +
-                self.gaze_calibration.poly_y[5])
+        # Check if ratios are valid
+        if hr is None or vr is None:
+             self.logger.debug("Horizontal or vertical ratio is None.")
+             return None
+
+        # Check if calibration polynomials are available
+        if self.gaze_calibration.poly_x is None or self.gaze_calibration.poly_y is None:
+             self.logger.warning("Calibration polynomials not available. Cannot compute gaze.")
+             return None
+
+        # Apply the polynomial mapping directly
+        try:
+            raw_x = (self.gaze_calibration.poly_x[0] * hr**2 +
+                    self.gaze_calibration.poly_x[1] * vr**2 +
+                    self.gaze_calibration.poly_x[2] * hr * vr +
+                    self.gaze_calibration.poly_x[3] * hr +
+                    self.gaze_calibration.poly_x[4] * vr +
+                    self.gaze_calibration.poly_x[5])
+
+            raw_y = (self.gaze_calibration.poly_y[0] * hr**2 +
+                    self.gaze_calibration.poly_y[1] * vr**2 +
+                    self.gaze_calibration.poly_y[2] * hr * vr +
+                    self.gaze_calibration.poly_y[3] * hr +
+                    self.gaze_calibration.poly_y[4] * vr +
+                    self.gaze_calibration.poly_y[5])
+        except IndexError:
+             self.logger.error("IndexError accessing polynomial coefficients. Calibration might be corrupt.")
+             return None
+
 
         if np.isnan(raw_x) or np.isnan(raw_y):
-            print('nan encountered in gaze estimation')
+            self.logger.warning('NaN encountered in gaze estimation result.')
             return None
 
         return int(round(raw_x)), int(round(raw_y))

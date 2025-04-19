@@ -1,6 +1,6 @@
 ### Project results / output
-output_videos/test_webcam_old.mp4
-output_videos/test_webcam.mp4
+test_videos/test_webcam_old.mp4
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
