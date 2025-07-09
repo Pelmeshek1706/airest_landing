@@ -5,7 +5,9 @@
 <title>Attention Bias Test</title>
 <style>
  body { text-align:center; font-family:Arial, sans-serif; }
+
  #displayCanvas { border:1px solid #ccc; margin-top:20px; width:100vw; height:100vh; }
+
  #slides { display:none; }
  .slide-img { width:45%; margin:0 2%; }
 </style>
@@ -16,6 +18,7 @@
  <button id="beginBtn">Begin</button>
 </div>
 <canvas id="displayCanvas" style="display:none;"></canvas>
+
 <div id="slides">
  <img id="imgLeft" class="slide-img" src="" alt="left">
  <img id="imgRight" class="slide-img" src="" alt="right">
@@ -105,8 +108,10 @@ function finishTest(){
 beginBtn.onclick = ()=>{
  startScreen.style.display='none';
  canvas.style.display='block';
+
  canvas.width = window.innerWidth;
  canvas.height = window.innerHeight;
+
  fetch('/start_test',{
      method:'POST',
      headers:{'Content-Type':'application/json'},

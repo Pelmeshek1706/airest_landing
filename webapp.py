@@ -89,6 +89,5 @@ def finish():
     return jsonify({'status':'done'})
 
 if __name__ == '__main__':
-    # Listen on all interfaces so the server is reachable from outside the
-    # local machine (useful when running in containers or remote VMs).
     app.run(host='0.0.0.0', port=5000, debug=True)
+
