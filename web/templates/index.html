@@ -20,8 +20,20 @@
   display: block;
  }
 
- #slides { display:none; }
- .slide-img { width:45%; margin:0 2%; }
+ #slides {
+  display:none;
+  display:flex;
+  width:100vw;
+  height:100vh;
+  justify-content:center;
+  align-items:center;
+}
+ .slide-img {
+  width:25vw;
+  height:25vh;
+  margin:0 2vw;
+  object-fit:contain;
+}
 </style>
 </head>
 <body>
@@ -90,7 +102,7 @@ function pollCalibration() {
      if(data.status === 'finished_all') {
          clearInterval(calibInterval);
          canvas.style.display='none';
-         slidesDiv.style.display='block';
+         slidesDiv.style.display='flex';
          startSlides();
      }
  });
