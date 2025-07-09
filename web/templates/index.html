@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Attention Bias Test</title>
+<style>
+ body { text-align:center; font-family:Arial, sans-serif; }
+ #displayCanvas { border:1px solid #ccc; margin-top:20px; }
+ #slides { display:none; }
+ .slide-img { width:45%; margin:0 2%; }
+</style>
+</head>
+<body>
+<div id="startScreen">
+ <h1>Attention Bias Test</h1>
+ <button id="beginBtn">Begin</button>
+</div>
+<canvas id="displayCanvas" width="800" height="600" style="display:none;"></canvas>
+<div id="slides">
+ <img id="imgLeft" class="slide-img" src="" alt="left">
+ <img id="imgRight" class="slide-img" src="" alt="right">
+</div>
+<div id="thankYou" style="display:none;">
+ <h2>Thank you for completing test</h2>
+</div>
+<script>
+const beginBtn = document.getElementById('beginBtn');
+const startScreen = document.getElementById('startScreen');
+const canvas = document.getElementById('displayCanvas');
+const ctx = canvas.getContext('2d');
+const slidesDiv = document.getElementById('slides');
+const imgLeft = document.getElementById('imgLeft');
+const imgRight = document.getElementById('imgRight');
+const thankYou = document.getElementById('thankYou');
+let calibInterval = null;
+let slideInterval = null;
+let currentSlide = 0;
+const TOTAL_SLIDES = 10;
+const SLIDE_DURATION = 5000; // 5s
+
+function drawCalibration(info) {
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ if(info.type === 'instruction_text' || info.type === 'message') {
+     ctx.fillStyle='black';
+     ctx.font='30px Arial';
+     const lines = info.text.split('\n');
+     lines.forEach((line,i)=>{
+        const m = ctx.measureText(line);
+        ctx.fillText(line,(canvas.width-m.width)/2,150 + i*50);
+     });
+ } else if(info.type === 'fixation_dot' || info.type === 'test_dot') {
+     if(info.target_point){
+         ctx.fillStyle='red';
+         ctx.beginPath();
+         ctx.arc(info.target_point[0], info.target_point[1], 20, 0, Math.PI*2);
+         ctx.fill();
+     }
+ }
+}
+
+function pollCalibration() {
+ fetch('/calibration_step').then(r=>r.json()).then(data=>{
+     drawCalibration(data.display_info);
+     if(data.status === 'finished_all') {
+         clearInterval(calibInterval);
+         canvas.style.display='none';
+         slidesDiv.style.display='block';
+         startSlides();
+     }
+ });
+}
+
+function startSlides(){
+ fetch('/start_slides');
+ showSlide(0);
+ slideInterval = setInterval(()=>{
+     currentSlide++;
+     if(currentSlide>=TOTAL_SLIDES){
+         clearInterval(slideInterval);
+         finishTest();
+     } else {
+         showSlide(currentSlide);
+     }
+ }, SLIDE_DURATION);
+ recordGaze();
+}
+
+function showSlide(idx){
+ imgLeft.src = `/static/slides/slide${idx+1}_left.svg`;
+ imgRight.src = `/static/slides/slide${idx+1}_right.svg`;
+ fetch(`/set_slide/${idx}`); // notify server
+}
+
+function recordGaze(){
+ fetch(`/record_gaze?slide=${currentSlide}`);
+ setTimeout(recordGaze, 100); // 10 Hz
+}
+
+function finishTest(){
+ slidesDiv.style.display='none';
+ thankYou.style.display='block';
+ fetch('/finish');
+}
+
+beginBtn.onclick = ()=>{
+ startScreen.style.display='none';
+ canvas.style.display='block';
+ fetch('/start_test',{
+     method:'POST',
+     headers:{'Content-Type':'application/json'},
+     body: JSON.stringify({width:window.innerWidth, height:window.innerHeight})
+ }).then(()=>{
+     calibInterval = setInterval(pollCalibration, 100);
+ });
+};
+</script>
+</body>
+</html>
