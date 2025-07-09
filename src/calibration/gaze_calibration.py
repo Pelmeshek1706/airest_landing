@@ -443,19 +443,18 @@ class GazeCalibration:
         if phase is None: phase = self.current_phase # Default to current phase
 
         update = {
-            'status': status, # 'calibrating', 'calculating', 'finished_point', 'finished_stage', 'finished_all', 'error'
+            'status': status,  # 'calibrating', 'calculating', 'finished_point', 'finished_stage', 'finished_all', 'error'
             'stage': self.current_stage,
             'phase': phase,
             'progress': {
-                'current_point': self.current_point_index,
-                'total_points': self.num_calibration_points,
-                'phase_progress': round(min(phase_progress, 1.0), 2) # Ensure progress is 0-1
+                'current_point': int(self.current_point_index),
+                'total_points': int(self.num_calibration_points),
+                'phase_progress': float(round(min(phase_progress, 1.0), 2))
             },
             'display_info': {
-                'type': display_type, # 'instruction_text', 'fixation_dot', 'test_dot', 'message'
-                # Convert numpy array to tuple for easier JSON serialization if needed later
-                'target_point': tuple(target_point.astype(int)) if target_point is not None else None,
-                'estimated_gaze': tuple(np.array(estimated_gaze).astype(int)) if estimated_gaze is not None else None,
+                'type': display_type,  # 'instruction_text', 'fixation_dot', 'test_dot', 'message'
+                'target_point': [int(target_point[0]), int(target_point[1])] if target_point is not None else None,
+                'estimated_gaze': [int(estimated_gaze[0]), int(estimated_gaze[1])] if estimated_gaze is not None else None,
                 'text': text,
             }
         }
@@ -659,11 +658,11 @@ class GazeCalibration:
             return {'mean_x': None, 'mean_y': None, 'mean_xy': None, 'count': 0}
 
         count = len(self.errors_dict['xy'])
-        mean_x = np.mean(np.abs(self.errors_dict['x'])) if self.errors_dict['x'] else None
-        mean_y = np.mean(np.abs(self.errors_dict['y'])) if self.errors_dict['y'] else None
-        mean_xy = np.mean(np.abs(self.errors_dict['xy'])) # xy should always exist if count > 0
+        mean_x = float(np.mean(np.abs(self.errors_dict['x']))) if self.errors_dict['x'] else None
+        mean_y = float(np.mean(np.abs(self.errors_dict['y']))) if self.errors_dict['y'] else None
+        mean_xy = float(np.mean(np.abs(self.errors_dict['xy'])))
 
-        return {'mean_x': mean_x, 'mean_y': mean_y, 'mean_xy': mean_xy, 'count': count}
+        return {'mean_x': mean_x, 'mean_y': mean_y, 'mean_xy': mean_xy, 'count': int(count)}
 
     def print_aggregated_errors(self):
         """Prints the aggregated estimation errors from the test stage."""

@@ -203,3 +203,16 @@ finally:
     print("API stopped.")
 
 ```
+
+## Web Demo
+
+The repository includes a simple Flask application that demonstrates a basic
+attention-bias test. To run it locally:
+
+```bash
+python webapp.py
+```
+
+By default the server listens on port 5000 and all network interfaces
+(<http://0.0.0.0:5000>). Open the displayed URL in your browser to start the
+calibration and slideshow process.
