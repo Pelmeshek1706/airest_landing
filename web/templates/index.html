@@ -58,6 +58,17 @@ function drawCalibration(info) {
          ctx.arc(info.target_point[0], info.target_point[1], 20, 0, Math.PI*2);
          ctx.fill();
      }
+     if(info.type === 'test_dot' && info.estimated_gaze){
+         const [gx, gy] = info.estimated_gaze;
+         ctx.strokeStyle = 'blue';
+         ctx.lineWidth = 3;
+         ctx.beginPath();
+         ctx.moveTo(gx - 10, gy);
+         ctx.lineTo(gx + 10, gy);
+         ctx.moveTo(gx, gy - 10);
+         ctx.lineTo(gx, gy + 10);
+         ctx.stroke();
+     }
  }
 }
 
