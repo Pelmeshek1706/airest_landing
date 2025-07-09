@@ -102,22 +102,39 @@ function recordGaze(){
 function finishTest(){
  slidesDiv.style.display='none';
  thankYou.style.display='block';
+ if(document.exitFullscreen){
+     document.exitFullscreen();
+ } else if(document.webkitExitFullscreen){
+     document.webkitExitFullscreen();
+ }
  fetch('/finish');
 }
 
 beginBtn.onclick = ()=>{
- startScreen.style.display='none';
- canvas.style.display='block';
+ const docEl = document.documentElement;
+ const requestFS = docEl.requestFullscreen ||
+                   docEl.webkitRequestFullscreen ||
+                   docEl.mozRequestFullScreen ||
+                   docEl.msRequestFullscreen;
+ let fsPromise = Promise.resolve();
+ if(requestFS){
+     const result = requestFS.call(docEl);
+     if(result && typeof result.then === 'function') fsPromise = result;
+ }
 
- canvas.width = window.innerWidth;
- canvas.height = window.innerHeight;
+ fsPromise.finally(()=>{
+     startScreen.style.display='none';
+     canvas.style.display='block';
+     canvas.width = window.innerWidth;
+     canvas.height = window.innerHeight;
 
- fetch('/start_test',{
-     method:'POST',
-     headers:{'Content-Type':'application/json'},
-     body: JSON.stringify({width:window.innerWidth, height:window.innerHeight})
- }).then(()=>{
-     calibInterval = setInterval(pollCalibration, 100);
+     fetch('/start_test',{
+         method:'POST',
+         headers:{'Content-Type':'application/json'},
+         body: JSON.stringify({width:window.innerWidth, height:window.innerHeight})
+     }).then(()=>{
+         calibInterval = setInterval(pollCalibration, 100);
+     });
  });
 };
 </script>
