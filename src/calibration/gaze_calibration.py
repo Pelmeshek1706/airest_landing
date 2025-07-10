@@ -62,7 +62,7 @@ class GazeCalibration:
             setattr(self, key, value)
 
     def get_current_parameters(self):
-        return {k: getattr(self, k, None) for k in self.DEFAULT_PARAMS}
+         return {k: getattr(self, k, None) for k in self.DEFAULT_PARAMS}
 
     def _init_calibration_points(self, stage):
         self.calibration_points = self._generate_calibration_points(extreme_points=(stage == "ratios"))
@@ -129,7 +129,9 @@ class GazeCalibration:
         
         if not space_down:
             self.frame_counter = 0
-            self.calibration_ratios_raw[self.current_point_index] = []
+            # bug fix: add boundary check before accessing the list index
+            if self.current_point_index < self.num_calibration_points:
+                self.calibration_ratios_raw[self.current_point_index] = []
             self.current_phase = self.PHASE_AWAITING_TRIGGER
             self.logger.warning(f"Collection for point {self.current_point_index} interrupted, data discarded.")
             target_point = self.calibration_points[self.current_point_index]
@@ -215,7 +217,8 @@ class GazeCalibration:
             'estimated_gaze': estimated_gaze,
             'outer_circle_radius': outer_radius,
             'is_point_completed': is_completed,
-            'inner_circle_radius': self.circle_radius
+            'inner_circle_radius': self.circle_radius,
+            'outer_circle_initial_radius': self.outer_circle_initial_radius,
         }
 
         update = {
@@ -304,11 +307,11 @@ class GazeCalibration:
     def print_aggregated_errors(self):
         errors = self.get_aggregated_errors()
         if errors['count'] > 0:
-            print(f"\n--- Calibration Test Stage Errors ({errors['count']} samples) ---")
-            print(f"Mean Absolute Error X : {errors['mean_x']:.2f} pixels")
-            print(f"Mean Absolute Error Y : {errors['mean_y']:.2f} pixels")
-            print(f"Mean Euclidian Error XY: {errors['mean_xy']:.2f} pixels")
-            print("--------------------------------------------------")
+            self.logger.info(f"--- Calibration Test Stage Errors ({errors['count']} samples) ---")
+            self.logger.info(f"Mean Absolute Error X : {errors['mean_x']:.2f} pixels")
+            self.logger.info(f"Mean Absolute Error Y : {errors['mean_y']:.2f} pixels")
+            self.logger.info(f"Mean Euclidian Error XY: {errors['mean_xy']:.2f} pixels")
+            self.logger.info("--------------------------------------------------")
         else:
             self.logger.info("No error data was collected during the test stage.")
 

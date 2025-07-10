@@ -8,7 +8,7 @@
   margin: 0;
   text-align: center;
   font-family: Arial, sans-serif;
-  overflow: hidden; /* avoid scrollbars in fullscreen */
+  overflow: hidden;
  }
 
  #displayCanvas {
@@ -16,9 +16,10 @@
   width: 100vw;
   height: 100vh;
   margin: 0;
-  box-sizing: border-box; /* keep border within viewport */
+  box-sizing: border-box;
   display: block;
   cursor: none;
+  background-color: #f0f0f0;
  }
 
  #slides {
@@ -36,6 +37,7 @@
   object-fit:contain;
 }
 </style>
+<script src="{{ url_for('static', filename='js/animations.js') }}" defer></script>
 </head>
 <body>
 <div id="startScreen">
@@ -45,7 +47,7 @@
 <canvas id="displayCanvas" style="display:none;"></canvas>
 
 <div id="slides">
- <img id="imgLeft" class="slide-img" src="" alt="left">
+ <img id="imgLeft" class.slide-img" src="" alt="left">
  <img id="imgRight" class="slide-img" src="" alt="right">
 </div>
 <div id="thankYou" style="display:none;">
@@ -55,22 +57,24 @@
 const beginBtn = document.getElementById('beginBtn');
 const startScreen = document.getElementById('startScreen');
 const canvas = document.getElementById('displayCanvas');
-const ctx = canvas.getContext('2d');
 const slidesDiv = document.getElementById('slides');
 const imgLeft = document.getElementById('imgLeft');
 const imgRight = document.getElementById('imgRight');
 const thankYou = document.getElementById('thankYou');
-let calibInterval = null;
+
+let pollTimeoutId = null;
 let slideInterval = null;
 let currentSlide = 0;
 const TOTAL_SLIDES = 10;
-const SLIDE_DURATION = 5000; // 5s
+const SLIDE_DURATION = 5000;
 
 let isSpaceDown = false;
 let calibrationActive = false;
+let currentCalibrationInfo = null;
+
 
 document.addEventListener('keydown', (event) => {
-    if (calibrationActive && event.code === 'Space') {
+    if (calibrationActive && event.code === 'Space' && !event.repeat) {
         isSpaceDown = true;
         event.preventDefault();
     }
@@ -81,74 +85,52 @@ document.addEventListener('keyup', (event) => {
     }
 });
 
-function drawCalibration(info) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (info.type === 'instruction_text' || info.type === 'message') {
-        ctx.fillStyle = 'black';
-        ctx.font = '30px Arial';
-        const lines = info.text.split('\n');
-        lines.forEach((line, i) => {
-            const m = ctx.measureText(line);
-            ctx.fillText(line, (canvas.width - m.width) / 2, 150 + i * 50);
-        });
-    } else if (info.type === 'fixation_dot' || info.type === 'test_dot') {
-        if (!info.target_point) return;
-        
-        const [targetX, targetY] = info.target_point;
-
-        if (info.outer_circle_radius) {
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(targetX, targetY, info.outer_circle_radius, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
-        ctx.fillStyle = info.is_point_completed ? 'green' : 'red';
-        ctx.beginPath();
-        ctx.arc(targetX, targetY, info.inner_circle_radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (info.type === 'test_dot' && info.estimated_gaze) {
-            const [gx, gy] = info.estimated_gaze;
-            ctx.strokeStyle = 'blue';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(gx - 10, gy);
-            ctx.lineTo(gx + 10, gy);
-            ctx.moveTo(gx, gy - 10);
-            ctx.lineTo(gx, gy + 10);
-            ctx.stroke();
-        }
-    }
-}
-
-
 function pollCalibration() {
-    fetch('/calibration_step?space_down=' + (isSpaceDown ? '1' : '0')).then(r => r.json()).then(data => {
+    if (!calibrationActive) return; // stop polling if not active
+
+    const url = '/calibration_step?space_down=' + (isSpaceDown ? '1' : '0');
+    
+    fetch(url).then(r => r.json()).then(data => {
         if (data.status === 'not_calibrating' || data.status === 'error') {
             console.error("Calibration error or not active, stopping poll");
-            clearInterval(calibInterval);
             calibrationActive = false;
+            Animator.stop();
             return;
         }
+        
+        const prevInfo = currentCalibrationInfo;
+        currentCalibrationInfo = data;
+        
+        const currentPhase = data.phase;
+        const prevPhase = prevInfo ? prevInfo.phase : null;
 
-        drawCalibration(data.display_info);
+        if (currentPhase !== prevPhase) {
+            Animator.setPhase(currentPhase);
+        }
+
+        if (currentPhase === 'point_completed' && prevPhase !== 'point_completed') {
+            const [x, y] = data.display_info.target_point;
+            Animator.triggerCompletionEffect(x, y);
+        }
+
         if (data.status === 'finished_all') {
-            clearInterval(calibInterval);
             calibrationActive = false;
-            canvas.style.display = 'none';
-            slidesDiv.style.display = 'flex';
+            Animator.stop();
+            canvas.style.display='none';
+            slidesDiv.style.display='flex';
             startSlides();
         }
     }).catch(err => {
         console.error("Polling failed:", err);
-        clearInterval(calibInterval);
         calibrationActive = false;
+        Animator.stop();
+    }).finally(() => {
+        // chain the next poll request
+        if (calibrationActive) {
+            pollTimeoutId = setTimeout(pollCalibration, 33);
+        }
     });
 }
-
 
 function startSlides() {
     fetch('/start_slides');
@@ -172,14 +154,15 @@ function showSlide(idx) {
 }
 
 function recordGaze() {
-    if (!slideInterval) return; // stop recording if slides are done
+    if (!slideInterval) return;
     fetch(`/record_gaze?slide=${currentSlide}`);
-    setTimeout(recordGaze, 100); // 10 Hz
+    setTimeout(recordGaze, 100);
 }
 
 function finishTest() {
-    slidesDiv.style.display = 'none';
-    thankYou.style.display = 'block';
+    slideInterval = null;
+    slidesDiv.style.display='none';
+    thankYou.style.display='block';
     if (document.exitFullscreen) {
         document.exitFullscreen();
     } else if (document.webkitExitFullscreen) {
@@ -190,10 +173,7 @@ function finishTest() {
 
 beginBtn.onclick = () => {
     const docEl = document.documentElement;
-    const requestFS = docEl.requestFullscreen ||
-        docEl.webkitRequestFullscreen ||
-        docEl.mozRequestFullScreen ||
-        docEl.msRequestFullscreen;
+    const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
     let fsPromise = Promise.resolve();
     if (requestFS) {
         const result = requestFS.call(docEl);
@@ -201,23 +181,25 @@ beginBtn.onclick = () => {
     }
 
     fsPromise.finally(() => {
-        startScreen.style.display = 'none';
-        canvas.style.display = 'block';
+        startScreen.style.display='none';
+        canvas.style.display='block';
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
         fetch('/start_test', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                width: window.innerWidth,
-                height: window.innerHeight
-            })
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({width: window.innerWidth, height: window.innerHeight})
         }).then(() => {
             calibrationActive = true;
-            calibInterval = setInterval(pollCalibration, 100);
+            
+            Animator.init(canvas);
+            Animator.run(() => {
+                Animator.draw(currentCalibrationInfo);
+            });
+            
+            // start the polling chain
+            pollCalibration();
         });
     });
 };
