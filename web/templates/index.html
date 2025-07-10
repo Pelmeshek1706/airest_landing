@@ -10,7 +10,6 @@
   font-family: Arial, sans-serif;
   overflow: hidden;
  }
-
  #displayCanvas {
   border: 1px solid #ccc;
   width: 100vw;
@@ -21,7 +20,6 @@
   cursor: none;
   background-color: #f0f0f0;
  }
-
  #slides {
   display:none;
   display:flex;
@@ -37,6 +35,7 @@
   object-fit:contain;
 }
 </style>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='js/animations.js') }}" defer></script>
 </head>
 <body>
@@ -62,45 +61,38 @@ const imgLeft = document.getElementById('imgLeft');
 const imgRight = document.getElementById('imgRight');
 const thankYou = document.getElementById('thankYou');
 
-let pollTimeoutId = null;
+let socket = null;
 let slideInterval = null;
 let currentSlide = 0;
 const TOTAL_SLIDES = 10;
 const SLIDE_DURATION = 5000;
 
-let isSpaceDown = false;
 let calibrationActive = false;
 let currentCalibrationInfo = null;
-
+let currentFPS = 0;
 
 document.addEventListener('keydown', (event) => {
     if (calibrationActive && event.code === 'Space' && !event.repeat) {
-        isSpaceDown = true;
+        if(socket) socket.emit('user_input', { 'space_down': true });
         event.preventDefault();
     }
 });
 document.addEventListener('keyup', (event) => {
     if (calibrationActive && event.code === 'Space') {
-        isSpaceDown = false;
+        if(socket) socket.emit('user_input', { 'space_down': false });
     }
 });
 
-function pollCalibration() {
-    if (!calibrationActive) return; // stop polling if not active
+function setupSocketListeners() {
+    socket.on('test_started', () => {
+        console.log('Server confirmed test has started.');
+    });
 
-    const url = '/calibration_step?space_down=' + (isSpaceDown ? '1' : '0');
-    
-    fetch(url).then(r => r.json()).then(data => {
-        if (data.status === 'not_calibrating' || data.status === 'error') {
-            console.error("Calibration error or not active, stopping poll");
-            calibrationActive = false;
-            Animator.stop();
-            return;
-        }
-        
+    socket.on('calibration_update', (data) => {
         const prevInfo = currentCalibrationInfo;
         currentCalibrationInfo = data;
-        
+        currentFPS = data.fps || 0;
+
         const currentPhase = data.phase;
         const prevPhase = prevInfo ? prevInfo.phase : null;
 
@@ -116,19 +108,22 @@ function pollCalibration() {
         if (data.status === 'finished_all') {
             calibrationActive = false;
             Animator.stop();
+            socket.disconnect();
             canvas.style.display='none';
             slidesDiv.style.display='flex';
             startSlides();
         }
-    }).catch(err => {
-        console.error("Polling failed:", err);
+    });
+
+    socket.on('calibration_error', (data) => {
+        console.error('Calibration Error:', data.message);
         calibrationActive = false;
         Animator.stop();
-    }).finally(() => {
-        // chain the next poll request
-        if (calibrationActive) {
-            pollTimeoutId = setTimeout(pollCalibration, 33);
-        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server.');
+        calibrationActive = false;
     });
 }
 
@@ -186,20 +181,22 @@ beginBtn.onclick = () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        fetch('/start_test', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({width: window.innerWidth, height: window.innerHeight})
-        }).then(() => {
+        socket = io();
+        setupSocketListeners();
+        
+        socket.on('connect', () => {
+            console.log('Connected to server, starting test.');
             calibrationActive = true;
             
             Animator.init(canvas);
             Animator.run(() => {
-                Animator.draw(currentCalibrationInfo);
+                Animator.draw(currentCalibrationInfo, currentFPS);
             });
-            
-            // start the polling chain
-            pollCalibration();
+
+            socket.emit('start_test', {
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
         });
     });
 };

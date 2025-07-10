@@ -27,7 +27,7 @@ class GazeCalibration:
         self.logger = logging.getLogger(__name__)
         self.gaze_tracking = gaze_tracking
         if not isinstance(monitor, dict) or 'width' not in monitor or 'height' not in monitor:
-             raise ValueError("GazeCalibration requires a valid monitor dictionary")
+            raise ValueError("GazeCalibration requires a valid monitor dictionary")
         self.monitor = monitor
         self.screen_width = monitor['width']
         self.screen_height = monitor['height']
@@ -62,7 +62,7 @@ class GazeCalibration:
             setattr(self, key, value)
 
     def get_current_parameters(self):
-         return {k: getattr(self, k, None) for k in self.DEFAULT_PARAMS}
+        return {k: getattr(self, k, None) for k in self.DEFAULT_PARAMS}
 
     def _init_calibration_points(self, stage):
         self.calibration_points = self._generate_calibration_points(extreme_points=(stage == "ratios"))
@@ -129,7 +129,6 @@ class GazeCalibration:
         
         if not space_down:
             self.frame_counter = 0
-            # bug fix: add boundary check before accessing the list index
             if self.current_point_index < self.num_calibration_points:
                 self.calibration_ratios_raw[self.current_point_index] = []
             self.current_phase = self.PHASE_AWAITING_TRIGGER

@@ -1,29 +1,43 @@
+# correct import order: patch first, but leave threading for the debugger
+import eventlet
+eventlet.monkey_patch(thread=False)
+
 import socket
 import cv2
 import time
 import json
 import logging
+from collections import deque
 from logging.handlers import RotatingFileHandler
+from eventlet.semaphore import BoundedSemaphore # import eventlet's semaphore
 from flask import Flask, jsonify, request, render_template
-from threading import Lock
+from flask_socketio import SocketIO, emit
 from src.api import GazeTrackerAPI
 
-app = Flask(__name__, static_folder='web/static', template_folder='web/templates')
 
-# configure logging to a file and reduce console noise
+# --- Logging Setup ---
 log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler = RotatingFileHandler('debug.log', maxBytes=1024 * 1024 * 5, backupCount=2)
 file_handler.setFormatter(log_formatter)
 file_handler.setLevel(logging.INFO)
-if app.logger.handlers:
-    app.logger.handlers.clear()
-app.logger.addHandler(file_handler)
-app.logger.setLevel(logging.INFO)
+root_logger = logging.getLogger()
+root_logger.addHandler(file_handler)
+root_logger.setLevel(logging.INFO)
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('socketio').setLevel(logging.ERROR)
+logging.getLogger('engineio').setLevel(logging.ERROR)
 
 
+app = Flask(__name__, static_folder='web/static', template_folder='web/templates')
+socketio = SocketIO(app, async_mode='eventlet')
+
+# --- Global State ---
 api = None
 cap = None
+# use the eventlet-safe semaphore
+lock = BoundedSemaphore(1)
+calibration_active = False
+
 calibration_params = {
     'instruction_frames': 50,
     'calibration_frames': 60,
@@ -35,74 +49,104 @@ calibration_params = {
 current_slide = 0
 recording = False
 gaze_data = []
-lock = Lock()
 
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/start_test', methods=['POST'])
-def start_test():
-    global api, cap
+@socketio.on('start_test')
+def handle_start_test(data):
+    global api, cap, calibration_active
     with lock:
-        dims = request.get_json() or {}
-        width = int(dims.get('width', 1280))
-        height = int(dims.get('height', 720))
+        width = int(data.get('width', 1280))
+        height = int(data.get('height', 720))
         
-        app.logger.info(f"Starting test with screen dimensions {width}x{height}")
+        logging.info(f"Starting test with screen dimensions {width}x{height}")
         api = GazeTrackerAPI(screen_width=width, screen_height=height)
         api.start()
         
         cap = cv2.VideoCapture(0)
         api.start_calibration(calibration_params)
-    
-    return jsonify({'status': 'started'})
+        calibration_active = True
+        
+        socketio.start_background_task(target=calibration_stream_task)
+    emit('test_started')
 
-@app.route('/calibration_step')
-def calibration_step():
-    ret, frame = cap.read()
-    if not ret:
-        app.logger.error("Failed to read frame from camera")
-        return jsonify({'status': 'error', 'display_info': {'type': 'message', 'text': 'Camera error'}})
-    
-    frame = cv2.flip(frame, 1)
-    
-    with lock:
-        if not api or not api.is_calibrating:
-            return jsonify({'status': 'not_calibrating'})
+def calibration_stream_task():
+    global api, cap, calibration_active
+    fps_tracker = deque(maxlen=20)
 
-        space_down = request.args.get('space_down', '0') == '1'
-        user_input = {'space_down': space_down}
-        status = api.process_calibration_step(frame, user_input=user_input)
+    while calibration_active:
+        with lock:
+            if not api or not api.is_calibrating:
+                calibration_active = False
+                break
+            
+            is_space_down = user_input_state.get('space_down', False)
+
+        current_time = time.time()
+        ret, frame = cap.read()
+        if not ret:
+            logging.error("Failed to read frame from camera")
+            socketio.emit('calibration_error', {'message': 'Camera error'})
+            break
+        
+        frame = cv2.flip(frame, 1)
+
+        with lock:
+            status = api.process_calibration_step(frame, user_input={'space_down': is_space_down})
+            
+            fps_tracker.append(current_time)
+            fps = 0
+            if len(fps_tracker) > 1:
+                time_span = fps_tracker[-1] - fps_tracker[0]
+                if time_span > 0:
+                    fps = (len(fps_tracker) - 1) / time_span
+            status['fps'] = fps
+
+        socketio.emit('calibration_update', status)
+        
+        if status['status'] == 'finished_all':
+            calibration_active = False
+            
+        socketio.sleep(0.01)
     
-    return jsonify(status)
+    logging.info("Calibration stream has ended.")
+
+
+user_input_state = {'space_down': False}
+@socketio.on('user_input')
+def handle_user_input(data):
+    global user_input_state
+    user_input_state['space_down'] = data.get('space_down', False)
+
 
 @app.route('/start_slides')
 def start_slides():
     global recording, gaze_data
     with lock:
-        app.logger.info("Starting slide presentation and gaze recording")
+        logging.info("Starting slide presentation and gaze recording")
         recording = True
         gaze_data = []
-    return jsonify({'status': 'ok'})
+    return jsonify({'status':'ok'})
 
 @app.route('/set_slide/<int:idx>')
-def set_slide(idx):
+def set_slide_route(idx):
     global current_slide
     with lock:
         current_slide = idx
-    return jsonify({'status': 'ok'})
+    return jsonify({'status':'ok'})
 
 @app.route('/record_gaze')
-def record_gaze():
+def record_gaze_route():
     global gaze_data
     if not recording:
-        return jsonify({'status': 'not_recording'})
+        return jsonify({'status':'not_recording'})
     
     ret, frame = cap.read()
     if not ret:
-        return jsonify({'status': 'camera_error'})
+        return jsonify({'status':'camera_error'})
     
     frame = cv2.flip(frame, 1)
     gaze = api.get_gaze(frame)
@@ -111,14 +155,15 @@ def record_gaze():
     with lock:
         gaze_data.append({'time': timestamp, 'slide': current_slide, 'x': gaze[0], 'y': gaze[1]})
     
-    return jsonify({'status': 'ok'})
+    return jsonify({'status':'ok'})
 
 @app.route('/finish')
 def finish():
-    global recording, api, cap
+    global recording, api, cap, calibration_active
     with lock:
-        app.logger.info("Finishing test session")
+        logging.info("Finishing test session")
         recording = False
+        calibration_active = False
         if cap:
             cap.release()
             cap = None
@@ -128,9 +173,9 @@ def finish():
 
         with open('api_test_results/web_gaze_data.json', 'w') as f:
             json.dump(gaze_data, f)
-        app.logger.info("Gaze data saved to api_test_results/web_gaze_data.json")
+        logging.info("Gaze data saved to api_test_results/web_gaze_data.json")
 
-    return jsonify({'status': 'done'})
+    return jsonify({'status':'done'})
 
 
 if __name__ == '__main__':
@@ -140,6 +185,5 @@ if __name__ == '__main__':
             return s.getsockname()[1]
 
     port = find_free_port()
-    app.logger.info(f"Starting server on port {port}. Open http://127.0.0.1:{port} in a browser")
-    app.run(host='0.0.0.0', port=port, debug=False)
-    
+    logging.info(f"Starting server on port {port}. Open http://127.0.0.1:{port} in a browser")
+    socketio.run(app, host='0.0.0.0', port=port)

@@ -44,7 +44,6 @@ const Animator = {
     particles: [],
     shockwave: { active: false, x: 0, y: 0, radius: 0, opacity: 1 },
     
-    // simplified opacity state for cross-fading
     idleOpacity: 1.0,
     collectingOpacity: 0.0,
     targetIdleOpacity: 1.0,
@@ -55,7 +54,6 @@ const Animator = {
         this.ctx = canvas.getContext('2d');
     },
 
-    // connects server state to animation targets
     setPhase(phase) {
         if (phase === 'collecting') {
             this.targetIdleOpacity = 0.0;
@@ -63,17 +61,19 @@ const Animator = {
         } else if (phase === 'awaiting_trigger') {
             this.targetIdleOpacity = 1.0;
             this.targetCollectingOpacity = 0.0;
-        } else { // for 'completed' or other states
+        } else {
             this.targetIdleOpacity = 0.0;
             this.targetCollectingOpacity = 0.0;
         }
     },
 
-    draw(status) {
+    draw(status, fps) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
         this.updateEffects();
         this.drawEffects();
+        
+        this.drawFPS(fps);
         
         if (!status || !status.display_info) return;
         
@@ -105,7 +105,6 @@ const Animator = {
         const info = status.display_info;
         if (!info.target_point) return;
 
-        // draw all components, letting opacity handle visibility
         this.drawAwaiting(info, this.idleOpacity);
         this.drawCollecting(info, this.collectingOpacity);
         this.drawInnerPoint(info);
@@ -171,6 +170,15 @@ const Animator = {
         this.ctx.lineTo(gx, gy + 10);
         this.ctx.stroke();
     },
+    
+    drawFPS(fps) {
+        if (fps > 0) {
+            this.ctx.fillStyle = 'black';
+            this.ctx.font = '16px Arial';
+            this.ctx.textAlign = 'left';
+            this.ctx.fillText(`Processing FPS: ${fps.toFixed(1)}`, 10, 20);
+        }
+    },
 
     triggerCompletionEffect(x, y) {
         for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -180,7 +188,6 @@ const Animator = {
     },
     
     updateEffects() {
-        // smoothly interpolate opacities towards their targets
         const lerpFactor = 0.15;
         this.idleOpacity += (this.targetIdleOpacity - this.idleOpacity) * lerpFactor;
         this.collectingOpacity += (this.targetCollectingOpacity - this.collectingOpacity) * lerpFactor;
