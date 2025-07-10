@@ -1,4 +1,3 @@
-# correct import order: patch first, but leave threading for the debugger
 import eventlet
 eventlet.monkey_patch(thread=False)
 
@@ -9,7 +8,7 @@ import json
 import logging
 from collections import deque
 from logging.handlers import RotatingFileHandler
-from eventlet.semaphore import BoundedSemaphore # import eventlet's semaphore
+from eventlet.semaphore import BoundedSemaphore
 from flask import Flask, jsonify, request, render_template
 from flask_socketio import SocketIO, emit
 from src.api import GazeTrackerAPI

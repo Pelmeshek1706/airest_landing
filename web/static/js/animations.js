@@ -1,5 +1,3 @@
-// web/static/js/animations.js
-
 const PARTICLE_COUNT = 30;
 const PARTICLE_SPEED = 2;
 const PARTICLE_LIFESPAN = 60;
