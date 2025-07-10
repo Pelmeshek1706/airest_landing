@@ -1,6 +1,9 @@
 ### Project results / output
 test_videos/test_webcam_old.mp4
 
+# Log files
+*.log
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
