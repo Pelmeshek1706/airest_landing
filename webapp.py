@@ -80,7 +80,7 @@ async def record_gaze_route(slide: int = 0):
     if not recording:
         return JSONResponse({'status': 'not_recording'})
 
-    ret, frame = cap.read()
+    ret, frame = await asyncio.to_thread(cap.read)
     if not ret:
         return JSONResponse({'status': 'camera_error'})
 
@@ -141,7 +141,7 @@ async def calibration_stream_task(sid):
                 break
             is_space_down = user_input_state.get('space_down', False)
         current_time = time.time()
-        ret, frame = cap.read()
+        ret, frame = await asyncio.to_thread(cap.read)
         if not ret:
             logging.error('Failed to read frame from camera')
             await sio.emit('calibration_error', {'message': 'Camera error'}, to=sid)
