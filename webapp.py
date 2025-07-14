@@ -85,7 +85,7 @@ async def record_gaze_route(slide: int = 0):
         return JSONResponse({'status': 'camera_error'})
 
     frame = cv2.flip(frame, 1)
-    gaze = api.get_gaze(frame)
+    gaze = await asyncio.to_thread(api.get_gaze, frame)
     timestamp = time.time()
 
     async with lock:
@@ -147,8 +147,12 @@ async def calibration_stream_task(sid):
             await sio.emit('calibration_error', {'message': 'Camera error'}, to=sid)
             break
         frame = cv2.flip(frame, 1)
+        status = await asyncio.to_thread(
+            api.process_calibration_step,
+            frame,
+            user_input={'space_down': is_space_down},
+        )
         async with lock:
-            status = api.process_calibration_step(frame, user_input={'space_down': is_space_down})
             fps_tracker.append(current_time)
             fps = 0
             if len(fps_tracker) > 1:
