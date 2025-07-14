@@ -12,4 +12,6 @@ PyQt5-Qt5==5.15.15
 PyQt5_sip==12.15.0
 qt_material==2.14
 Xlib==0.21
-Flask==3.0.3
+fastapi==0.110.0
+uvicorn==0.29.0
+python-socketio==5.11.2

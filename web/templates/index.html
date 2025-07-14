@@ -36,7 +36,7 @@
 }
 </style>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="{{ url_for('static', filename='js/animations.js') }}" defer></script>
+<script src="{{ url_for('static', path='js/animations.js') }}" defer></script>
 </head>
 <body>
 <div id="startScreen">
@@ -46,7 +46,7 @@
 <canvas id="displayCanvas" style="display:none;"></canvas>
 
 <div id="slides">
- <img id="imgLeft" class.slide-img" src="" alt="left">
+ <img id="imgLeft" class="slide-img" src="" alt="left">
  <img id="imgRight" class="slide-img" src="" alt="right">
 </div>
 <div id="thankYou" style="display:none;">
