@@ -206,13 +206,13 @@ finally:
 
 ## Web Demo
 
-The repository includes a simple Flask application that demonstrates a basic
+The repository includes a simple FastAPI application that demonstrates a basic
 attention-bias test. To run it locally:
 
 ```bash
 python webapp.py
 ```
 
-By default the server listens on port 5000 and all network interfaces
-(<http://0.0.0.0:5000>). Open the displayed URL in your browser to start the
-calibration and slideshow process.
+The application selects an available port automatically and binds to all
+network interfaces. Check the console output for the URL and open it in your
+browser to start the calibration and slideshow process.
