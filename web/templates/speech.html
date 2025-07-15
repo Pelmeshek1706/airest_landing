@@ -90,7 +90,9 @@
 
     // --- State & Logging ---
     let currentTask = 0;
-    const sessionId = crypto.randomUUID();
+    const sessionId = crypto.randomUUID ?
+                       crypto.randomUUID() :
+                       (Date.now().toString(36) + Math.random().toString(36).slice(2));
     const eventLog = [];
     const attemptCount = {};
     function logEvent(type, task = null) {
