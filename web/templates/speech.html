@@ -198,6 +198,9 @@
                    'video/webm;codecs=vp8,opus';
       mediaRecorder = new MediaRecorder(stream, { mimeType: chosenMime });
       mediaRecorder.ondataavailable = e => { if (e.data.size) recordedChunks.push(e.data); };
+      mediaRecorder.onstart = () => {
+        logEvent('session_start');
+      };
       mediaRecorder.onstop = () => {
         freezeWave();
         const ext = chosenMime.startsWith('video/mp4') ? '.mp4' : '.webm';
@@ -282,7 +285,6 @@
         return;
       }
       mediaRecorder.start();
-      logEvent('session_start');
       hide('titlePage'); show('testPage');
       showTask(1);
     };
