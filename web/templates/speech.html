@@ -259,6 +259,7 @@
     startTestBtn.onclick = async () => {
       if (!tasksLoaded) await loadTasks();
       await initMedia();
+      mediaRecorder.start();
       logEvent('session_start');
       hide('titlePage'); show('testPage');
       showTask(1);
@@ -269,18 +270,10 @@
       startTaskBtn.disabled = true;
       stopTaskBtn.disabled = false;
       showWave();
-      if (mediaRecorder.state === 'inactive') {
-        mediaRecorder.start();
-      } else if (mediaRecorder.state === 'paused') {
-        mediaRecorder.resume();
-      }
     };
     stopTaskBtn.onclick = () => {
       logEvent('task_stop', currentTask);
       freezeWave();
-      if (mediaRecorder.state === 'recording') {
-        mediaRecorder.pause();
-      }
       retryTaskBtn.disabled = false;
       nextTaskBtn.disabled = false;
     };
