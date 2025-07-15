@@ -80,12 +80,12 @@ async def record_gaze_route(slide: int = 0):
     if not recording:
         return JSONResponse({'status': 'not_recording'})
 
-    ret, frame = cap.read()
+    ret, frame = await asyncio.to_thread(cap.read)
     if not ret:
         return JSONResponse({'status': 'camera_error'})
 
     frame = cv2.flip(frame, 1)
-    gaze = api.get_gaze(frame)
+    gaze = await asyncio.to_thread(api.get_gaze, frame)
     timestamp = time.time()
 
     async with lock:
@@ -126,6 +126,7 @@ async def handle_start_test(sid, data):
         api = GazeTrackerAPI(screen_width=width, screen_height=height)
         api.start()
         cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FPS, 30)
         api.start_calibration(calibration_params)
         calibration_active = True
         sio.start_background_task(calibration_stream_task, sid)
@@ -134,21 +135,27 @@ async def handle_start_test(sid, data):
 async def calibration_stream_task(sid):
     global api, cap, calibration_active
     fps_tracker = deque(maxlen=20)
+    target_frame_time = 1.0 / 30.0
     while calibration_active:
+        loop_start = time.time()
         async with lock:
             if not api or not api.is_calibrating:
                 calibration_active = False
                 break
             is_space_down = user_input_state.get('space_down', False)
         current_time = time.time()
-        ret, frame = cap.read()
+        ret, frame = await asyncio.to_thread(cap.read)
         if not ret:
             logging.error('Failed to read frame from camera')
             await sio.emit('calibration_error', {'message': 'Camera error'}, to=sid)
             break
         frame = cv2.flip(frame, 1)
+        status = await asyncio.to_thread(
+            api.process_calibration_step,
+            frame,
+            user_input={'space_down': is_space_down},
+        )
         async with lock:
-            status = api.process_calibration_step(frame, user_input={'space_down': is_space_down})
             fps_tracker.append(current_time)
             fps = 0
             if len(fps_tracker) > 1:
@@ -159,7 +166,8 @@ async def calibration_stream_task(sid):
         await sio.emit('calibration_update', status, to=sid)
         if status['status'] == 'finished_all':
             calibration_active = False
-        await asyncio.sleep(0.01)
+        elapsed = time.time() - loop_start
+        await asyncio.sleep(max(0, target_frame_time - elapsed))
     logging.info('Calibration stream has ended.')
 
 @sio.on('user_input')
