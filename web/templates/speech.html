@@ -171,8 +171,17 @@
 
     // --- MediaRecorder ---
     let mediaRecorder, chosenMime, recordedChunks = [];
+    async function requestMedia(constraints) {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        return navigator.mediaDevices.getUserMedia(constraints);
+      }
+      const legacy = navigator.getUserMedia || navigator.webkitGetUserMedia ||
+                     navigator.mozGetUserMedia;
+      if (!legacy) throw new Error('getUserMedia unsupported');
+      return new Promise((res, rej) => legacy.call(navigator, constraints, res, rej));
+    }
     async function initMedia() {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await requestMedia({
         audio: true,
         video: { width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
