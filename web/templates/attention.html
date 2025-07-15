@@ -1,57 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Attention Bias Test</title>
-<style>
- body {
-  margin: 0;
-  text-align: center;
-  font-family: Arial, sans-serif;
-  overflow: hidden;
- }
- #displayCanvas {
-  border: 1px solid #ccc;
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  box-sizing: border-box;
-  display: block;
-  cursor: none;
-  background-color: #f0f0f0;
- }
- #slides {
-  display:none;
-  display:flex;
-  width:100vw;
-  height:100vh;
-  justify-content:center;
-  align-items:center;
-}
- .slide-img {
-  width:25vw;
-  height:25vh;
-  margin:0 2vw;
-  object-fit:contain;
-}
-</style>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="{{ url_for('static', path='js/animations.js') }}" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attention Bias Test</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin:0; overflow:hidden; }
+    #displayCanvas {
+      width:100vw; height:100vh; display:block;
+      background:#f0f0f0; cursor:none;
+    }
+    #slides {
+      display:flex; width:100vw; height:100vh;
+      justify-content:center; align-items:center;
+    }
+    .slide-img { width:25vw; height:25vh; margin:0 2vw; object-fit:contain; }
+  </style>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="{{ url_for('static', path='js/animations.js') }}" defer></script>
 </head>
-<body>
-<div id="startScreen">
- <h1>Attention Bias Test</h1>
- <button id="beginBtn">Begin</button>
-</div>
-<canvas id="displayCanvas" style="display:none;"></canvas>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div id="startScreen" class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
+    <h1 class="text-4xl font-extrabold text-gray-800 mb-6">AIREST</h1>
+    <h2 class="text-2xl text-gray-800 mb-6">Attention Bias Test</h2>
+    <button id="beginBtn"
+            class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-3 px-8 rounded-2xl shadow-lg transform transition hover:scale-105">
+      Почати тест
+    </button>
+  </div>
 
-<div id="slides">
- <img id="imgLeft" class="slide-img" src="" alt="left">
- <img id="imgRight" class="slide-img" src="" alt="right">
-</div>
-<div id="thankYou" style="display:none;">
- <h2>Thank you for completing test</h2>
-</div>
+  <canvas id="displayCanvas" style="display:none;"></canvas>
+
+  <div id="slides" style="display:none;">
+    <img id="imgLeft" class="slide-img" src="" alt="left" />
+    <img id="imgRight" class="slide-img" src="" alt="right" />
+  </div>
+
+  <div id="thankYou" class="hidden bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
+    <h2 class="text-3xl font-bold text-gray-800 mb-4">Дякуємо за проходження тесту!</h2>
+    <button id="restartBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow transform transition hover:scale-105">
+      На головну
+    </button>
+  </div>
 <script>
 const beginBtn = document.getElementById('beginBtn');
 const startScreen = document.getElementById('startScreen');
@@ -163,7 +154,7 @@ function finishTest() {
     } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen();
     }
-    fetch('/finish').then(() => { window.location.href = '/'; });
+    fetch('/finish');
 }
 
 beginBtn.onclick = () => {
@@ -199,6 +190,9 @@ beginBtn.onclick = () => {
             });
         });
     });
+};
+document.getElementById('restartBtn').onclick = () => {
+    window.location.href = '/';
 };
 </script>
 </body>
