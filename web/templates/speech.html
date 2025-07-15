@@ -172,7 +172,10 @@
     // --- MediaRecorder ---
     let mediaRecorder, chosenMime, recordedChunks = [];
     async function initMedia() {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
       setupAnalyser(stream);
       chosenMime = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ?
                    'video/mp4;codecs=avc1' :
@@ -257,7 +260,6 @@
       if (!tasksLoaded) await loadTasks();
       await initMedia();
       logEvent('session_start');
-      mediaRecorder.start();
       hide('titlePage'); show('testPage');
       showTask(1);
     };
@@ -267,10 +269,18 @@
       startTaskBtn.disabled = true;
       stopTaskBtn.disabled = false;
       showWave();
+      if (mediaRecorder.state === 'inactive') {
+        mediaRecorder.start();
+      } else if (mediaRecorder.state === 'paused') {
+        mediaRecorder.resume();
+      }
     };
     stopTaskBtn.onclick = () => {
       logEvent('task_stop', currentTask);
       freezeWave();
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.pause();
+      }
       retryTaskBtn.disabled = false;
       nextTaskBtn.disabled = false;
     };
