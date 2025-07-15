@@ -126,6 +126,7 @@ async def handle_start_test(sid, data):
         api = GazeTrackerAPI(screen_width=width, screen_height=height)
         api.start()
         cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FPS, 30)
         api.start_calibration(calibration_params)
         calibration_active = True
         sio.start_background_task(calibration_stream_task, sid)
@@ -134,7 +135,9 @@ async def handle_start_test(sid, data):
 async def calibration_stream_task(sid):
     global api, cap, calibration_active
     fps_tracker = deque(maxlen=20)
+    target_frame_time = 1.0 / 30.0
     while calibration_active:
+        loop_start = time.time()
         async with lock:
             if not api or not api.is_calibrating:
                 calibration_active = False
@@ -163,7 +166,8 @@ async def calibration_stream_task(sid):
         await sio.emit('calibration_update', status, to=sid)
         if status['status'] == 'finished_all':
             calibration_active = False
-        await asyncio.sleep(0.01)
+        elapsed = time.time() - loop_start
+        await asyncio.sleep(max(0, target_frame_time - elapsed))
     logging.info('Calibration stream has ended.')
 
 @sio.on('user_input')
