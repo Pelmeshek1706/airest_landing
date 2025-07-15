@@ -172,11 +172,16 @@
     // --- MediaRecorder ---
     let mediaRecorder, chosenMime, recordedChunks = [];
     async function requestMedia(constraints) {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        return navigator.mediaDevices.getUserMedia(constraints);
-      }
-      const legacy = navigator.getUserMedia || navigator.webkitGetUserMedia ||
-                     navigator.mozGetUserMedia;
+      const modern = navigator.mediaDevices &&
+                     typeof navigator.mediaDevices.getUserMedia === 'function'
+                       ? navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+                       : null;
+      if (modern) return modern(constraints);
+
+      const legacy = navigator.getUserMedia ||
+                     navigator.webkitGetUserMedia ||
+                     navigator.mozGetUserMedia ||
+                     navigator.msGetUserMedia;
       if (!legacy) throw new Error('getUserMedia unsupported');
       return new Promise((res, rej) => legacy.call(navigator, constraints, res, rej));
     }
@@ -269,7 +274,13 @@
     // --- Button flows ---
     startTestBtn.onclick = async () => {
       if (!tasksLoaded) await loadTasks();
-      await initMedia();
+      try {
+        await initMedia();
+      } catch (err) {
+        alert('Ваш браузер не підтримує запис відео/аудіо: ' + err.message);
+        console.error('initMedia failed', err);
+        return;
+      }
       mediaRecorder.start();
       logEvent('session_start');
       hide('titlePage'); show('testPage');
