@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Attention Bias Test</title>
+<style>
+ body {
+  margin: 0;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+ }
+ #displayCanvas {
+  border: 1px solid #ccc;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  box-sizing: border-box;
+  display: block;
+  cursor: none;
+  background-color: #f0f0f0;
+ }
+ #slides {
+  display:none;
+  display:flex;
+  width:100vw;
+  height:100vh;
+  justify-content:center;
+  align-items:center;
+}
+ .slide-img {
+  width:25vw;
+  height:25vh;
+  margin:0 2vw;
+  object-fit:contain;
+}
+</style>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="{{ url_for('static', path='js/animations.js') }}" defer></script>
+</head>
+<body>
+<div id="startScreen">
+ <h1>Attention Bias Test</h1>
+ <button id="beginBtn">Begin</button>
+</div>
+<canvas id="displayCanvas" style="display:none;"></canvas>
+
+<div id="slides">
+ <img id="imgLeft" class="slide-img" src="" alt="left">
+ <img id="imgRight" class="slide-img" src="" alt="right">
+</div>
+<div id="thankYou" style="display:none;">
+ <h2>Thank you for completing test</h2>
+</div>
+<script>
+const beginBtn = document.getElementById('beginBtn');
+const startScreen = document.getElementById('startScreen');
+const canvas = document.getElementById('displayCanvas');
+const slidesDiv = document.getElementById('slides');
+const imgLeft = document.getElementById('imgLeft');
+const imgRight = document.getElementById('imgRight');
+const thankYou = document.getElementById('thankYou');
+
+let socket = null;
+let slideInterval = null;
+let currentSlide = 0;
+const TOTAL_SLIDES = 10;
+const SLIDE_DURATION = 5000;
+
+let calibrationActive = false;
+let currentCalibrationInfo = null;
+let currentFPS = 0;
+
+document.addEventListener('keydown', (event) => {
+    if (calibrationActive && event.code === 'Space' && !event.repeat) {
+        if(socket) socket.emit('user_input', { 'space_down': true });
+        event.preventDefault();
+    }
+});
+document.addEventListener('keyup', (event) => {
+    if (calibrationActive && event.code === 'Space') {
+        if(socket) socket.emit('user_input', { 'space_down': false });
+    }
+});
+
+function setupSocketListeners() {
+    socket.on('test_started', () => {
+        console.log('Server confirmed test has started.');
+    });
+
+    socket.on('calibration_update', (data) => {
+        const prevInfo = currentCalibrationInfo;
+        currentCalibrationInfo = data;
+        currentFPS = data.fps || 0;
+
+        const currentPhase = data.phase;
+        const prevPhase = prevInfo ? prevInfo.phase : null;
+
+        if (currentPhase !== prevPhase) {
+            Animator.setPhase(currentPhase);
+        }
+
+        if (currentPhase === 'point_completed' && prevPhase !== 'point_completed') {
+            const [x, y] = data.display_info.target_point;
+            Animator.triggerCompletionEffect(x, y);
+        }
+
+        if (data.status === 'finished_all') {
+            calibrationActive = false;
+            Animator.stop();
+            socket.disconnect();
+            canvas.style.display='none';
+            slidesDiv.style.display='flex';
+            startSlides();
+        }
+    });
+
+    socket.on('calibration_error', (data) => {
+        console.error('Calibration Error:', data.message);
+        calibrationActive = false;
+        Animator.stop();
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server.');
+        calibrationActive = false;
+    });
+}
+
+function startSlides() {
+    fetch('/start_slides');
+    showSlide(0);
+    slideInterval = setInterval(() => {
+        currentSlide++;
+        if (currentSlide >= TOTAL_SLIDES) {
+            clearInterval(slideInterval);
+            finishTest();
+        } else {
+            showSlide(currentSlide);
+        }
+    }, SLIDE_DURATION);
+    recordGaze();
+}
+
+function showSlide(idx) {
+    imgLeft.src = `/static/slides/slide${idx+1}_left.svg`;
+    imgRight.src = `/static/slides/slide${idx+1}_right.svg`;
+    fetch(`/set_slide/${idx}`);
+}
+
+function recordGaze() {
+    if (!slideInterval) return;
+    fetch(`/record_gaze?slide=${currentSlide}`);
+    setTimeout(recordGaze, 100);
+}
+
+function finishTest() {
+    slideInterval = null;
+    slidesDiv.style.display='none';
+    thankYou.style.display='block';
+    if (document.exitFullscreen) {
+        document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+    }
+    fetch('/finish').then(() => { window.location.href = '/'; });
+}
+
+beginBtn.onclick = () => {
+    const docEl = document.documentElement;
+    const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+    let fsPromise = Promise.resolve();
+    if (requestFS) {
+        const result = requestFS.call(docEl);
+        if (result && typeof result.then === 'function') fsPromise = result;
+    }
+
+    fsPromise.finally(() => {
+        startScreen.style.display='none';
+        canvas.style.display='block';
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        socket = io();
+        setupSocketListeners();
+        
+        socket.on('connect', () => {
+            console.log('Connected to server, starting test.');
+            calibrationActive = true;
+            
+            Animator.init(canvas);
+            Animator.run(() => {
+                Animator.draw(currentCalibrationInfo, currentFPS);
+            });
+
+            socket.emit('start_test', {
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
+        });
+    });
+};
+</script>
+</body>
+</html>

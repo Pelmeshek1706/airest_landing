@@ -1,3 +1,4 @@
+import os
 import asyncio
 import socket
 import cv2
@@ -7,10 +8,13 @@ import logging
 from collections import deque
 from logging.handlers import RotatingFileHandler
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, Form
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from werkzeug.utils import secure_filename
 import socketio
 
 from src.api import GazeTrackerAPI
@@ -58,6 +62,13 @@ user_input_state = {'space_down': False}
 async def index(request: Request):
     return templates.TemplateResponse('index.html', {'request': request})
 
+@app.get('/attention', response_class=HTMLResponse)
+async def attention(request: Request):
+    return templates.TemplateResponse('attention.html', {'request': request})
+
+@app.get('/speech', response_class=HTMLResponse)
+async def speech(request: Request):
+    return templates.TemplateResponse('speech.html', {'request': request})
 @app.get('/start_slides')
 async def start_slides():
     global recording, gaze_data
@@ -111,6 +122,16 @@ async def finish():
         logging.info('Gaze data saved to api_test_results/web_gaze_data.json')
     return JSONResponse({'status': 'done'})
 
+@app.post('/upload')
+async def upload(session_id: str = Form(...), events: str = Form('[]'), video_blob: UploadFile = File(...)):
+    video_ext = '.webm' if video_blob.filename.endswith('.webm') else '.mp4'
+    video_path = os.path.join(UPLOAD_FOLDER, secure_filename(session_id + video_ext))
+    with open(video_path, 'wb') as f:
+        f.write(await video_blob.read())
+    events_path = os.path.join(UPLOAD_FOLDER, secure_filename(f'{session_id}_events.json'))
+    with open(events_path, 'w') as f:
+        f.write(events)
+    return JSONResponse({'success': True, 'video_path': video_path, 'events_path': events_path})
 # --- Socket.IO Events ---
 @sio.event
 async def connect(sid, environ):
