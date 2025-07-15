@@ -55,7 +55,7 @@ const thankYou = document.getElementById('thankYou');
 let socket = null;
 let slideInterval = null;
 let currentSlide = 0;
-const TOTAL_SLIDES = 10;
+let totalSlides = 10;
 const SLIDE_DURATION = 5000;
 
 let calibrationActive = false;
@@ -118,12 +118,23 @@ function setupSocketListeners() {
     });
 }
 
-function startSlides() {
+async function loadSlideCount() {
+    try {
+        const res = await fetch('/static/slides_config.json');
+        const data = await res.json();
+        totalSlides = data.total_slides || totalSlides;
+    } catch (err) {
+        console.error('Failed to load slide config', err);
+    }
+}
+
+async function startSlides() {
+    await loadSlideCount();
     fetch('/start_slides');
     showSlide(0);
     slideInterval = setInterval(() => {
         currentSlide++;
-        if (currentSlide >= TOTAL_SLIDES) {
+        if (currentSlide >= totalSlides) {
             clearInterval(slideInterval);
             finishTest();
         } else {
