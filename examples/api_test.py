@@ -1,6 +1,11 @@
 ### --- Imports and Setup --- ###
 
-import cv2
+import pytest
+try:
+    import cv2
+except Exception:
+    cv2 = None
+    pytest.skip("OpenCV not installed", allow_module_level=True)
 import numpy as np
 import os
 import sys

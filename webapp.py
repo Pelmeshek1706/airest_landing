@@ -1,7 +1,6 @@
 import os
 import asyncio
 import socket
-import cv2
 import time
 import json
 import logging
@@ -17,7 +16,6 @@ from fastapi.staticfiles import StaticFiles
 from werkzeug.utils import secure_filename
 import socketio
 
-from src.api import GazeTrackerAPI
 
 # --- Logging Setup ---
 log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -91,6 +89,7 @@ async def record_gaze_route(slide: int = 0):
     if not recording:
         return JSONResponse({'status': 'not_recording'})
 
+    import cv2
     ret, frame = await asyncio.to_thread(cap.read)
     if not ret:
         return JSONResponse({'status': 'camera_error'})
@@ -140,6 +139,13 @@ async def connect(sid, environ):
 @sio.on('start_test')
 async def handle_start_test(sid, data):
     global api, cap, calibration_active
+    try:
+        import cv2
+        from src.api import GazeTrackerAPI
+    except Exception as e:
+        logging.error('Gaze tracking dependencies missing: %s', e)
+        await sio.emit('calibration_error', {'message': 'Server missing OpenCV'}, to=sid)
+        return
     async with lock:
         width = int(data.get('width', 1280))
         height = int(data.get('height', 720))
@@ -155,6 +161,7 @@ async def handle_start_test(sid, data):
 
 async def calibration_stream_task(sid):
     global api, cap, calibration_active
+    import cv2
     fps_tracker = deque(maxlen=20)
     target_frame_time = 1.0 / 30.0
     while calibration_active:
