@@ -25,7 +25,7 @@ class Particle {
 
     draw(ctx) {
         const opacity = this.life / this.initialLife;
-        ctx.fillStyle = `rgba(0, 255, 128, ${opacity})`;
+        ctx.fillStyle = `rgba(14, 165, 233, ${opacity})`;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -90,8 +90,8 @@ const Animator = {
     },
 
     drawInstruction(text) {
-        this.ctx.fillStyle = 'black';
-        this.ctx.font = '30px Arial';
+        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        this.ctx.font = '600 28px "Space Grotesk", sans-serif';
         const lines = text.split('\n');
         lines.forEach((line, i) => {
             const m = this.ctx.measureText(line);
@@ -123,8 +123,8 @@ const Animator = {
         const pulseProgress = (Math.sin(this.pulseFactor * 2) + 1) / 2;
         const pulseRadius = info.inner_circle_radius + 10 + (pulseProgress * 15);
         
-        this.ctx.strokeStyle = `rgba(255, 0, 0, ${opacity * 0.6})`;
-        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = `rgba(99, 102, 241, ${opacity * 0.7})`;
+        this.ctx.lineWidth = 3;
         this.ctx.beginPath();
         this.ctx.arc(targetX, targetY, pulseRadius, 0, Math.PI * 2);
         this.ctx.stroke();
@@ -134,7 +134,7 @@ const Animator = {
         if (opacity <= 0) return;
         const [targetX, targetY] = info.target_point;
         
-        this.ctx.strokeStyle = `rgba(0, 191, 255, ${opacity * 0.9})`;
+        this.ctx.strokeStyle = `rgba(14, 165, 233, ${opacity * 0.9})`;
         this.ctx.lineWidth = 4;
         this.ctx.beginPath();
         this.ctx.arc(targetX, targetY, info.outer_circle_radius, 0, Math.PI * 2);
@@ -143,7 +143,7 @@ const Animator = {
     
     drawInnerPoint(info) {
         const [targetX, targetY] = info.target_point;
-        this.ctx.fillStyle = 'red';
+        this.ctx.fillStyle = '#2563eb';
         this.ctx.beginPath();
         this.ctx.arc(targetX, targetY, info.inner_circle_radius, 0, Math.PI * 2);
         this.ctx.fill();
@@ -151,7 +151,7 @@ const Animator = {
 
     drawCompleted(info) {
         const [targetX, targetY] = info.target_point;
-        this.ctx.fillStyle = 'green';
+        this.ctx.fillStyle = '#10b981';
         this.ctx.beginPath();
         this.ctx.arc(targetX, targetY, info.inner_circle_radius, 0, Math.PI * 2);
         this.ctx.fill();
@@ -159,7 +159,7 @@ const Animator = {
     
     drawGaze(gaze) {
         const [gx, gy] = gaze;
-        this.ctx.strokeStyle = 'blue';
+        this.ctx.strokeStyle = '#f59e0b';
         this.ctx.lineWidth = 3;
         this.ctx.beginPath();
         this.ctx.moveTo(gx - 10, gy);
@@ -171,8 +171,8 @@ const Animator = {
     
     drawFPS(fps) {
         if (fps > 0) {
-            this.ctx.fillStyle = 'black';
-            this.ctx.font = '16px Arial';
+            this.ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+            this.ctx.font = '12px "Space Grotesk", sans-serif';
             this.ctx.textAlign = 'left';
             this.ctx.fillText(`Processing FPS: ${fps.toFixed(1)}`, 10, 20);
         }
@@ -206,7 +206,7 @@ const Animator = {
         this.particles.forEach(p => p.draw(this.ctx));
 
         if (this.shockwave.active) {
-            this.ctx.strokeStyle = `rgba(0, 255, 128, ${this.shockwave.opacity})`;
+            this.ctx.strokeStyle = `rgba(14, 165, 233, ${this.shockwave.opacity})`;
             this.ctx.lineWidth = 3;
             this.ctx.beginPath();
             this.ctx.arc(this.shockwave.x, this.shockwave.y, this.shockwave.radius, 0, Math.PI * 2);

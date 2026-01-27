@@ -6,26 +6,31 @@
   <title>Mental Health Test</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: 'Sora', sans-serif; }
-    .results-bg {
-      background: radial-gradient(900px 500px at 10% 15%, rgba(14, 165, 233, 0.15), transparent 60%),
-                  radial-gradient(900px 500px at 90% 10%, rgba(251, 191, 36, 0.2), transparent 60%),
-                  linear-gradient(160deg, #f8fafc 0%, #eef2f7 55%, #e2e8f0 100%);
+    body { font-family: 'Space Grotesk', sans-serif; }
+    .app-bg {
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(255, 244, 214, 0.8), transparent 60%),
+                  radial-gradient(900px 500px at 90% 10%, rgba(200, 240, 255, 0.7), transparent 60%),
+                  linear-gradient(160deg, #f8fafc 0%, #f1f5f9 45%, #e2e8f0 100%);
     }
     .grid-overlay {
       background-image:
-        linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
-      background-size: 32px 32px;
+        linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
     }
     .card {
       background: rgba(255, 255, 255, 0.85);
       border: 1px solid rgba(148, 163, 184, 0.35);
       backdrop-filter: blur(10px);
       box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    }
+    .header-blur {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
     }
     .fade-in {
       animation: fadeInUp 0.7s ease forwards;
@@ -41,141 +46,234 @@
     }
   </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body class="app-bg grid-overlay flex items-center justify-center min-h-screen">
+  <header class="fixed top-0 left-0 right-0 z-50 header-blur">
+    <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <span class="text-xs uppercase tracking-[0.3em] text-slate-500">AIREST</span>
+        <nav class="flex items-center gap-4 text-sm text-slate-600">
+          <a href="/" class="hover:text-slate-900" data-i18n="nav.main">Main</a>
+          <a href="/test" class="hover:text-slate-900" data-i18n="nav.test">Test</a>
+          <a href="/analytics_summary" class="hover:text-slate-900" data-i18n="nav.analytics">Analytics</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-1 py-1 shadow-sm">
+        <button type="button" data-lang="ua" class="px-3 py-1 text-xs font-semibold rounded-full">UA</button>
+        <button type="button" data-lang="en" class="px-3 py-1 text-xs font-semibold rounded-full">EN</button>
+      </div>
+    </div>
+  </header>
 
   <!-- Title Page -->
-  <div id="titlePage" class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
-    <h1 class="text-4xl font-extrabold text-gray-800 mb-6">AIREST</h1>
-    <h2 class="text-2xl text-gray-800 mb-6">Тест психічного здоров’я</h2>
+  <div id="titlePage" class="card p-8 rounded-2xl text-center max-w-md w-full">
+    <p class="text-xs uppercase tracking-[0.3em] text-slate-500 mb-3">AIREST</p>
+    <h1 class="text-3xl font-bold text-slate-900 mb-2" data-i18n="hero.title">Speech & Emotion Snapshot</h1>
+    <p class="text-sm text-slate-500 mb-5" data-i18n="hero.subtitle">Audio‑first insights from short guided prompts.</p>
+
+    <div class="flex flex-wrap justify-center gap-2 mb-5">
+      <span class="px-3 py-1 rounded-full bg-slate-900 text-white text-xs uppercase tracking-[0.2em]" data-i18n="chips.energy">Energy</span>
+      <span class="px-3 py-1 rounded-full bg-white/70 border border-slate-200 text-slate-600 text-xs uppercase tracking-[0.2em]" data-i18n="chips.clarity">Clarity</span>
+      <span class="px-3 py-1 rounded-full bg-white/70 border border-slate-200 text-slate-600 text-xs uppercase tracking-[0.2em]" data-i18n="chips.pauses">Pauses</span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-6">
+      <div class="rounded-2xl bg-gradient-to-br from-indigo-500/15 to-indigo-300/10 p-3 text-left">
+        <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500" data-i18n="preview.label">Preview</p>
+        <div class="mt-2 h-16 rounded-xl bg-gradient-to-r from-indigo-400/40 via-indigo-500/20 to-transparent"></div>
+        <p class="text-xs text-slate-500 mt-2" data-i18n="preview.energy">Energy timeline</p>
+      </div>
+      <div class="rounded-2xl bg-gradient-to-br from-emerald-400/20 to-emerald-200/10 p-3 text-left">
+        <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500" data-i18n="preview.clarity">Clarity</p>
+        <p class="text-2xl font-bold text-slate-900 mt-3">86</p>
+        <p class="text-xs text-slate-500 mt-1" data-i18n="preview.score">Demo score</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between text-xs text-slate-500 mb-5">
+      <span data-i18n="steps.record">Record</span>
+      <span class="text-slate-300">●</span>
+      <span data-i18n="steps.analyze">Analyze</span>
+      <span class="text-slate-300">●</span>
+      <span data-i18n="steps.results">Results</span>
+    </div>
+
+    <div class="text-left text-sm text-slate-600 space-y-2 mb-6">
+      <p class="text-xs uppercase tracking-[0.2em] text-slate-400" data-i18n="how.title">How it works</p>
+      <ul class="space-y-1 list-disc list-inside">
+        <li data-i18n="how.line1">Allow microphone and camera access.</li>
+        <li data-i18n="how.line2">Speak clearly during each prompt.</li>
+        <li data-i18n="how.line3">Use “Stop” to finish a prompt.</li>
+        <li data-i18n="how.line4">Total time is about 2–3 minutes.</li>
+      </ul>
+    </div>
     <button id="startTestBtn"
             class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700
                    text-white font-semibold py-3 px-8 rounded-2xl shadow-lg transform transition hover:scale-105">
-      Почати тест
+      <span data-i18n="buttons.startTest">Почати тест</span>
     </button>
     <button id="skipBtn"
             class="mt-4 block w-full border border-slate-200 text-slate-700 py-2.5 px-8 rounded-2xl shadow-sm hover:bg-slate-50 transition">
-      Demo results
+      <span data-i18n="buttons.demo">Demo results</span>
     </button>
+    <p class="text-xs text-slate-400 mt-4" data-i18n="footer.trust">Local demo • Data stays on device</p>
   </div>
 
   <!-- Test Page -->
-  <div id="testPage" class="hidden w-full max-w-3xl mx-auto">
-    <div class="bg-white p-8 rounded-2xl shadow-xl">
-      <div class="mb-6">
-        <h2 class="text-2xl font-semibold text-gray-700">
-          Завдання <span id="taskNumber" class="text-blue-600"></span> з
-          <span id="totalTasks" class="text-blue-600"></span>
-        </h2>
-        <div id="instruction" class="mt-2"></div>
-      </div>
+  <div id="testPage" class="hidden w-full max-w-6xl mx-auto px-6">
+    <div class="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6">
+      <div class="card p-8 rounded-3xl">
+        <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-500 mb-2" data-i18n="task.badge">Speech task</p>
+            <h2 class="text-2xl font-semibold text-slate-900">
+              <span data-i18n="task.label">Завдання</span>
+              <span id="taskNumber" class="text-indigo-600"></span>
+              <span data-i18n="task.of">з</span>
+              <span id="totalTasks" class="text-indigo-600"></span>
+            </h2>
+          </div>
+          <div class="text-xs text-slate-500">
+            <p data-i18n="task.status">Status</p>
+            <p class="text-sm font-semibold text-slate-900" data-i18n="task.statusReady">Ready</p>
+          </div>
+        </div>
 
-      <!-- Waveform + Timer -->
-      <div id="waveformContainer"
-           class="hidden flex items-center justify-center mb-6 space-x-4 mx-auto">
-        <canvas id="waveform" width="560" height="100"
-                class="rounded-xl bg-transparent flex-shrink-0"></canvas>
-        <span id="waveTime" class="text-gray-700 font-mono text-lg">00:00</span>
-      </div>
+        <div id="instruction" class="text-lg text-slate-700 font-medium"></div>
 
-      <!-- Controls -->
-      <div class="flex justify-center space-x-4">
-        <button id="startTaskBtn"
-                class="bg-green-500 hover:bg-green-600 text-white py-2 px-5 rounded-xl shadow disabled:opacity-50"
-                disabled>Почати завдання</button>
-        <button id="stopTaskBtn"
-                class="bg-red-500 hover:bg-red-600 text-white py-2 px-5 rounded-xl shadow disabled:opacity-50"
-                disabled>Зупинити завдання</button>
-        <button id="retryTaskBtn"
-                class="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-5 rounded-xl shadow disabled:opacity-50"
-                disabled>Повторити завдання</button>
-        <button id="nextTaskBtn"
-                class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-5 rounded-xl shadow disabled:opacity-50"
-                disabled>Наступне завдання</button>
+        <div id="waveformContainer" class="hidden mt-6">
+          <div class="flex flex-col md:flex-row items-center justify-between gap-4 rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3">
+            <canvas id="waveform" width="560" height="100"
+                    class="rounded-xl bg-transparent flex-shrink-0"></canvas>
+            <span id="waveTime" class="text-slate-700 font-mono text-lg">00:00</span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-3 mt-6">
+          <button id="startTaskBtn"
+                  class="bg-slate-900 hover:bg-slate-800 text-white py-3 px-6 rounded-2xl shadow disabled:opacity-50"
+                  disabled><span data-i18n="buttons.startTask">Почати завдання</span></button>
+          <button id="stopTaskBtn"
+                  class="bg-rose-500 hover:bg-rose-600 text-white py-3 px-6 rounded-2xl shadow disabled:opacity-50"
+                  disabled><span data-i18n="buttons.stopTask">Зупинити завдання</span></button>
+          <button id="retryTaskBtn"
+                  class="bg-white/80 border border-slate-200 text-slate-700 py-3 px-6 rounded-2xl shadow-sm hover:bg-white disabled:opacity-50"
+                  disabled><span data-i18n="buttons.retryTask">Повторити завдання</span></button>
+          <button id="nextTaskBtn"
+                  class="bg-indigo-500 hover:bg-indigo-600 text-white py-3 px-6 rounded-2xl shadow disabled:opacity-50"
+                  disabled><span data-i18n="buttons.nextTask">Наступне завдання</span></button>
+        </div>
+      </div>
+      <div class="grid gap-4">
+        <div class="card p-6 rounded-3xl">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-3" data-i18n="tips.title">Recording tips</p>
+          <ul class="text-sm text-slate-600 space-y-2">
+            <li data-i18n="tips.line1">Stay 50–70 cm from the screen.</li>
+            <li data-i18n="tips.line2">Speak at a steady, natural pace.</li>
+            <li data-i18n="tips.line3">Keep background noise minimal.</li>
+          </ul>
+        </div>
+        <div class="card p-6 rounded-3xl">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-3" data-i18n="status.title">Session quality</p>
+          <div class="space-y-3 text-sm text-slate-600">
+            <div class="flex items-center justify-between">
+              <span data-i18n="status.mic">Microphone</span>
+              <span class="font-semibold text-slate-900" data-i18n="status.ok">Ready</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span data-i18n="status.camera">Camera</span>
+              <span class="font-semibold text-slate-900" data-i18n="status.ok">Ready</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span data-i18n="status.environment">Environment</span>
+              <span class="font-semibold text-slate-900" data-i18n="status.quiet">Quiet</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Thank You Page -->
   <div id="thankYouPage"
-       class="hidden bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
-    <h1 class="text-3xl font-bold text-gray-800 mb-4">Дякуємо!</h1>
-    <p class="text-gray-600 mb-6">Ваші відповіді були записані.</p>
+       class="hidden card p-8 rounded-2xl text-center max-w-md w-full">
+    <h1 class="text-3xl font-bold text-slate-900 mb-4" data-i18n="thank.title">Дякуємо!</h1>
+    <p class="text-slate-600 mb-6" data-i18n="thank.subtitle">Ваші відповіді були записані.</p>
     <button id="restartBtn"
-            class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow transform transition hover:scale-105">
-      На головну
+            class="bg-slate-900 hover:bg-slate-800 text-white py-2 px-6 rounded-2xl shadow transform transition hover:scale-105">
+      <span data-i18n="buttons.home">На головну</span>
     </button>
   </div>
 
-  <div id="resultsPage" class="hidden w-full h-full results-bg grid-overlay overflow-auto">
+  <div id="resultsPage" class="hidden w-full h-full app-bg grid-overlay overflow-auto">
     <div class="max-w-6xl mx-auto px-6 py-10">
       <div class="flex items-center justify-between mb-8">
         <div>
-          <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Speech Analysis</p>
-          <h2 class="text-4xl font-bold text-slate-900">Audio Insights Summary</h2>
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-500" data-i18n="results.summary">Speech Analysis</p>
+          <h2 class="text-4xl font-bold text-slate-900" data-i18n="results.title">Audio Insights Summary</h2>
         </div>
         <button id="resultsHomeBtn" class="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg hover:bg-slate-800 transition">
-          На головну
+          <span data-i18n="buttons.home">На головну</span>
         </button>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div class="card rounded-3xl p-5 fade-in delay-1">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Speech Rate</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.rate">Speech Rate</p>
           <p id="metricRate" class="text-3xl font-bold text-slate-900">132 wpm</p>
-          <p class="text-sm text-slate-500 mt-1">Balanced tempo</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.rateCaption">Balanced tempo</p>
         </div>
         <div class="card rounded-3xl p-5 fade-in delay-2">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Energy</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.energy">Energy</p>
           <p id="metricEnergy" class="text-3xl font-bold text-slate-900">74</p>
-          <p class="text-sm text-slate-500 mt-1">Stable vocal intensity</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.energyCaption">Stable vocal intensity</p>
         </div>
         <div class="card rounded-3xl p-5 fade-in delay-3">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Pause Ratio</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.pause">Pause Ratio</p>
           <p id="metricPauses" class="text-3xl font-bold text-slate-900">18%</p>
-          <p class="text-sm text-slate-500 mt-1">Healthy pacing</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.pauseCaption">Healthy pacing</p>
         </div>
         <div class="card rounded-3xl p-5 fade-in delay-4">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Clarity</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.clarity">Clarity</p>
           <p id="metricClarity" class="text-3xl font-bold text-slate-900">86</p>
-          <p class="text-sm text-slate-500 mt-1">Clear articulation</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.clarityCaption">Clear articulation</p>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="card rounded-3xl p-6 lg:col-span-2 fade-in delay-1">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-semibold text-slate-900">Energy Timeline</h3>
-            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Placeholder</span>
+            <h3 class="text-xl font-semibold text-slate-900" data-i18n="results.energyTimeline">Energy Timeline</h3>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400" data-i18n="results.placeholder">Placeholder</span>
           </div>
           <canvas id="energyChart" class="w-full h-48"></canvas>
         </div>
         <div class="card rounded-3xl p-6 fade-in delay-2">
-          <h3 class="text-xl font-semibold text-slate-900 mb-4">Pause Distribution</h3>
+          <h3 class="text-xl font-semibold text-slate-900 mb-4" data-i18n="results.pauseDistribution">Pause Distribution</h3>
           <canvas id="pauseChart" class="w-full h-48"></canvas>
-          <p class="text-sm text-slate-500 mt-3">Short vs long pauses</p>
+          <p class="text-sm text-slate-500 mt-3" data-i18n="results.pauseCaption2">Short vs long pauses</p>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div class="card rounded-3xl p-6 fade-in delay-3">
-          <h3 class="text-xl font-semibold text-slate-900 mb-4">Tone Snapshot</h3>
+          <h3 class="text-xl font-semibold text-slate-900 mb-4" data-i18n="results.tone">Tone Snapshot</h3>
           <canvas id="toneChart" class="w-full h-40"></canvas>
-          <p class="text-sm text-slate-500 mt-3">Emotional contour across prompts</p>
+          <p class="text-sm text-slate-500 mt-3" data-i18n="results.toneCaption">Emotional contour across prompts</p>
         </div>
         <div class="card rounded-3xl p-6 fade-in delay-4">
-          <h3 class="text-xl font-semibold text-slate-900 mb-4">Key Observations</h3>
+          <h3 class="text-xl font-semibold text-slate-900 mb-4" data-i18n="results.keyFindings">Key Observations</h3>
           <div class="space-y-4 text-slate-600">
             <div class="flex items-start gap-3">
               <div class="w-2 h-2 rounded-full bg-emerald-500 mt-2"></div>
-              <p>Strong energy stability across the session.</p>
+              <p data-i18n="results.finding1">Strong energy stability across the session.</p>
             </div>
             <div class="flex items-start gap-3">
               <div class="w-2 h-2 rounded-full bg-amber-500 mt-2"></div>
-              <p>Pauses clustered mid-tasks, suggesting reflection.</p>
+              <p data-i18n="results.finding2">Pauses clustered mid-tasks, suggesting reflection.</p>
             </div>
             <div class="flex items-start gap-3">
               <div class="w-2 h-2 rounded-full bg-indigo-500 mt-2"></div>
-              <p>Tone indicates calm but engaged responses.</p>
+              <p data-i18n="results.finding3">Tone indicates calm but engaged responses.</p>
             </div>
           </div>
         </div>
@@ -184,11 +282,11 @@
   </div>
 
   <div id="errorBanner" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center">
-    <div class="bg-white p-6 rounded-2xl shadow-xl max-w-md text-center">
-      <h3 class="text-2xl font-bold text-gray-800 mb-2">Помилка</h3>
-      <p id="errorMessage" class="text-gray-600 mb-4">Сталася помилка під час тесту.</p>
+    <div class="card p-6 rounded-2xl max-w-md text-center">
+      <h3 class="text-2xl font-bold text-slate-900 mb-2" data-i18n="error.title">Помилка</h3>
+      <p id="errorMessage" class="text-slate-600 mb-4" data-i18n="error.generic">Сталася помилка під час тесту.</p>
       <button id="errorHomeBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow">
-        На головну
+        <span data-i18n="buttons.home">На головну</span>
       </button>
     </div>
   </div>
@@ -346,7 +444,7 @@
         const res = await fetch('/upload', { method: 'POST', body: f });
         if (!res.ok) throw new Error('Upload failed');
       } catch (err) {
-        showError('Не вдалося завантажити запис');
+        showError('error.upload');
       }
     }
 
@@ -363,6 +461,8 @@
           resultsPage       = document.getElementById('resultsPage'),
           errorBanner       = document.getElementById('errorBanner'),
           errorMessage      = document.getElementById('errorMessage');
+    const langButtons = document.querySelectorAll('[data-lang]');
+    let currentLang = 'ua';
 
     const tasksPromise = loadTasks();
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -382,13 +482,13 @@
         : t.text.split('\n\n');
       texts.forEach(pt => {
         const p = document.createElement('p');
-        p.className = 'mt-2 text-gray-600 text-xl';
+        p.className = 'mt-2 text-slate-600 text-xl';
         p.textContent = pt;
         instr.appendChild(p);
       });
       if (t.chunk) {
         const ch = document.createElement('p');
-        ch.className = 'mt-4 text-base text-gray-600';
+        ch.className = 'mt-4 text-base text-slate-600';
         ch.textContent = t.chunk;
         instr.appendChild(ch);
       }
@@ -397,7 +497,7 @@
         wrapper.className = [
           'mt-4','w-[400px]','h-[400px]','flex',
           'items-center','justify-center','mx-auto',
-          'rounded-lg','shadow-sm','bg-gray-100'
+          'rounded-lg','shadow-sm','bg-slate-100'
         ].join(' ');
         const img = document.createElement('img');
         img.src = t.img;
@@ -419,7 +519,7 @@
         await initMedia();
       } catch (err) {
         console.error('initMedia failed', err);
-        showError('Немає доступу до камери або мікрофона');
+        showError('error.permission');
         return;
       }
       mediaRecorder.start();
@@ -485,13 +585,183 @@
     }
 
     function showError(message) {
-      errorMessage.textContent = message;
+      const translated = translations[currentLang]?.[message] || message;
+      errorMessage.textContent = translated;
       errorBanner.classList.remove('hidden');
       hide('titlePage');
       hide('testPage');
       hide('thankYouPage');
       resultsPage.classList.add('hidden');
     }
+
+    const translations = {
+      ua: {
+        "nav.main": "Головна",
+        "nav.test": "Тест",
+        "nav.analytics": "Аналітика",
+        "hero.title": "Зріз мовлення та емоцій",
+        "hero.subtitle": "Аудіоінсайти з коротких підказок.",
+        "chips.energy": "Енергія",
+        "chips.clarity": "Чіткість",
+        "chips.pauses": "Паузи",
+        "preview.label": "Попередній перегляд",
+        "preview.energy": "Графік енергії",
+        "preview.clarity": "Чіткість",
+        "preview.score": "Демо оцінка",
+        "steps.record": "Запис",
+        "steps.analyze": "Аналіз",
+        "steps.results": "Результати",
+        "how.title": "Як це працює",
+        "how.line1": "Дозвольте доступ до мікрофона і камери.",
+        "how.line2": "Говоріть чітко під час кожного завдання.",
+        "how.line3": "Натисніть «Зупинити» щоб завершити.",
+        "how.line4": "Загалом потрібно 2–3 хвилини.",
+        "buttons.startTest": "Почати тест",
+        "buttons.demo": "Демо результати",
+        "buttons.startTask": "Почати завдання",
+        "buttons.stopTask": "Зупинити завдання",
+        "buttons.retryTask": "Повторити завдання",
+        "buttons.nextTask": "Наступне завдання",
+        "buttons.home": "На головну",
+        "footer.trust": "Локальна демонстрація • Дані залишаються на пристрої",
+        "task.badge": "Мовленнєве завдання",
+        "task.label": "Завдання",
+        "task.of": "з",
+        "task.status": "Статус",
+        "task.statusReady": "Готово",
+        "tips.title": "Поради запису",
+        "tips.line1": "Сядьте на відстані 50–70 см від екрана.",
+        "tips.line2": "Говоріть у природному темпі.",
+        "tips.line3": "Мінімізуйте фоновий шум.",
+        "status.title": "Якість сесії",
+        "status.mic": "Мікрофон",
+        "status.camera": "Камера",
+        "status.environment": "Середовище",
+        "status.ok": "Готово",
+        "status.quiet": "Тихо",
+        "thank.title": "Дякуємо!",
+        "thank.subtitle": "Ваші відповіді були записані.",
+        "results.summary": "Аналіз мовлення",
+        "results.title": "Підсумок аудіоінсайтів",
+        "results.rate": "Швидкість мовлення",
+        "results.rateCaption": "Збалансований темп",
+        "results.energy": "Енергія",
+        "results.energyCaption": "Стабільна гучність",
+        "results.pause": "Частка пауз",
+        "results.pauseCaption": "Здорова ритміка",
+        "results.clarity": "Чіткість",
+        "results.clarityCaption": "Чітка артикуляція",
+        "results.energyTimeline": "Динаміка енергії",
+        "results.placeholder": "Демо",
+        "results.pauseDistribution": "Розподіл пауз",
+        "results.pauseCaption2": "Короткі та довгі паузи",
+        "results.tone": "Тональний зріз",
+        "results.toneCaption": "Емоційний контур відповідей",
+        "results.keyFindings": "Ключові спостереження",
+        "results.finding1": "Стабільна енергія протягом сесії.",
+        "results.finding2": "Паузи частіше в середині завдань.",
+        "results.finding3": "Тон вказує на спокійні відповіді.",
+        "error.title": "Помилка",
+        "error.generic": "Сталася помилка під час тесту.",
+        "error.permission": "Немає доступу до камери або мікрофона",
+        "error.upload": "Не вдалося завантажити запис"
+      },
+      en: {
+        "nav.main": "Main",
+        "nav.test": "Test",
+        "nav.analytics": "Analytics",
+        "hero.title": "Speech & Emotion Snapshot",
+        "hero.subtitle": "Audio-first insights from short guided prompts.",
+        "chips.energy": "Energy",
+        "chips.clarity": "Clarity",
+        "chips.pauses": "Pauses",
+        "preview.label": "Preview",
+        "preview.energy": "Energy timeline",
+        "preview.clarity": "Clarity",
+        "preview.score": "Demo score",
+        "steps.record": "Record",
+        "steps.analyze": "Analyze",
+        "steps.results": "Results",
+        "how.title": "How it works",
+        "how.line1": "Allow microphone and camera access.",
+        "how.line2": "Speak clearly during each prompt.",
+        "how.line3": "Use “Stop” to finish a prompt.",
+        "how.line4": "Total time is about 2–3 minutes.",
+        "buttons.startTest": "Start test",
+        "buttons.demo": "Demo results",
+        "buttons.startTask": "Start prompt",
+        "buttons.stopTask": "Stop prompt",
+        "buttons.retryTask": "Retry",
+        "buttons.nextTask": "Next prompt",
+        "buttons.home": "Back to home",
+        "footer.trust": "Local demo • Data stays on device",
+        "task.badge": "Speech task",
+        "task.label": "Task",
+        "task.of": "of",
+        "task.status": "Status",
+        "task.statusReady": "Ready",
+        "tips.title": "Recording tips",
+        "tips.line1": "Stay 50–70 cm from the screen.",
+        "tips.line2": "Speak at a steady, natural pace.",
+        "tips.line3": "Keep background noise minimal.",
+        "status.title": "Session quality",
+        "status.mic": "Microphone",
+        "status.camera": "Camera",
+        "status.environment": "Environment",
+        "status.ok": "Ready",
+        "status.quiet": "Quiet",
+        "thank.title": "Thank you!",
+        "thank.subtitle": "Your responses were recorded.",
+        "results.summary": "Speech Analysis",
+        "results.title": "Audio Insights Summary",
+        "results.rate": "Speech Rate",
+        "results.rateCaption": "Balanced tempo",
+        "results.energy": "Energy",
+        "results.energyCaption": "Stable vocal intensity",
+        "results.pause": "Pause Ratio",
+        "results.pauseCaption": "Healthy pacing",
+        "results.clarity": "Clarity",
+        "results.clarityCaption": "Clear articulation",
+        "results.energyTimeline": "Energy Timeline",
+        "results.placeholder": "Placeholder",
+        "results.pauseDistribution": "Pause Distribution",
+        "results.pauseCaption2": "Short vs long pauses",
+        "results.tone": "Tone Snapshot",
+        "results.toneCaption": "Emotional contour across prompts",
+        "results.keyFindings": "Key Observations",
+        "results.finding1": "Strong energy stability across the session.",
+        "results.finding2": "Pauses clustered mid-tasks, suggesting reflection.",
+        "results.finding3": "Tone indicates calm but engaged responses.",
+        "error.title": "Error",
+        "error.generic": "An error occurred during the test.",
+        "error.permission": "Camera or microphone access denied",
+        "error.upload": "Failed to upload recording"
+      }
+    };
+
+    function applyLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('lang', lang);
+      document.documentElement.lang = lang === 'ua' ? 'uk' : 'en';
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.dataset.i18n;
+        if (translations[lang] && translations[lang][key]) {
+          el.textContent = translations[lang][key];
+        }
+      });
+      langButtons.forEach(btn => {
+        const isActive = btn.dataset.lang === lang;
+        btn.classList.toggle('bg-slate-900', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('text-slate-600', !isActive);
+      });
+    }
+
+    langButtons.forEach((btn) => {
+      btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
+    });
+
+    applyLanguage(localStorage.getItem('lang') || 'ua');
 
     function renderAudioInsights() {
       const seed = Date.now() % 1000;

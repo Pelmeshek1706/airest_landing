@@ -12,14 +12,14 @@
     body { margin:0; overflow:hidden; font-family: 'Space Grotesk', sans-serif; }
     #displayCanvas {
       width:100vw; height:100vh; display:block;
-      background:#f0f0f0; cursor:none;
+      background:transparent; cursor:none;
     }
     #slides {
       display:flex; width:100vw; height:100vh;
       justify-content:center; align-items:center;
     }
     .slide-img { width:25vw; height:25vh; margin:0 2vw; object-fit:contain; }
-    .results-bg {
+    .app-bg {
       background: radial-gradient(1200px 600px at 10% 10%, rgba(255, 244, 214, 0.8), transparent 60%),
                   radial-gradient(900px 500px at 90% 10%, rgba(200, 240, 255, 0.7), transparent 60%),
                   linear-gradient(160deg, #f8fafc 0%, #f1f5f9 45%, #e2e8f0 100%);
@@ -35,6 +35,11 @@
       backdrop-filter: blur(10px);
       border: 1px solid rgba(148, 163, 184, 0.35);
       box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    }
+    .header-blur {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
     }
     .fade-in {
       animation: fadeInUp 0.7s ease forwards;
@@ -52,18 +57,73 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="{{ url_for('static', path='js/animations.js') }}" defer></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-  <div id="startScreen" class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
-    <h1 class="text-4xl font-extrabold text-gray-800 mb-6">AIREST</h1>
-    <h2 class="text-2xl text-gray-800 mb-6">Attention Bias Test</h2>
+<body class="app-bg grid-overlay flex items-center justify-center min-h-screen">
+  <header id="pageHeader" class="fixed top-0 left-0 right-0 z-50 header-blur">
+    <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <span class="text-xs uppercase tracking-[0.3em] text-slate-500">AIREST</span>
+        <nav class="flex items-center gap-4 text-sm text-slate-600">
+          <a href="/" class="hover:text-slate-900" data-i18n="nav.main">Main</a>
+          <a href="/test" class="hover:text-slate-900" data-i18n="nav.test">Test</a>
+          <a href="/analytics_summary" class="hover:text-slate-900" data-i18n="nav.analytics">Analytics</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-1 py-1 shadow-sm">
+        <button type="button" data-lang="ua" class="px-3 py-1 text-xs font-semibold rounded-full">UA</button>
+        <button type="button" data-lang="en" class="px-3 py-1 text-xs font-semibold rounded-full">EN</button>
+      </div>
+    </div>
+  </header>
+  <div id="startScreen" class="card p-8 rounded-2xl text-center max-w-md w-full">
+    <p class="text-xs uppercase tracking-[0.3em] text-slate-500 mb-3">AIREST</p>
+    <h1 class="text-3xl font-bold text-slate-900 mb-2" data-i18n="hero.title">Attention Bias Insights</h1>
+    <p class="text-sm text-slate-500 mb-5" data-i18n="hero.subtitle">Measure gaze‑driven attention in under 60 seconds.</p>
+
+    <div class="flex flex-wrap justify-center gap-2 mb-5">
+      <span class="px-3 py-1 rounded-full bg-slate-900 text-white text-xs uppercase tracking-[0.2em]" data-i18n="chips.bias">Bias Score</span>
+      <span class="px-3 py-1 rounded-full bg-white/70 border border-slate-200 text-slate-600 text-xs uppercase tracking-[0.2em]" data-i18n="chips.latency">Latency</span>
+      <span class="px-3 py-1 rounded-full bg-white/70 border border-slate-200 text-slate-600 text-xs uppercase tracking-[0.2em]" data-i18n="chips.heatmap">Heatmap</span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-6">
+      <div class="rounded-2xl bg-gradient-to-br from-slate-900/10 to-slate-900/5 p-3 text-left">
+        <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500" data-i18n="preview.label">Preview</p>
+        <div class="mt-2 h-16 rounded-xl bg-gradient-to-r from-sky-400/30 via-sky-500/20 to-transparent"></div>
+        <p class="text-xs text-slate-500 mt-2" data-i18n="preview.heatmap">Heatmap overlay</p>
+      </div>
+      <div class="rounded-2xl bg-gradient-to-br from-amber-400/20 to-amber-200/10 p-3 text-left">
+        <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500" data-i18n="quality.label">Quality</p>
+        <p class="text-2xl font-bold text-slate-900 mt-3">92%</p>
+        <p class="text-xs text-slate-500 mt-1" data-i18n="quality.caption">Calibration fit</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between text-xs text-slate-500 mb-5">
+      <span data-i18n="steps.calibrate">Calibrate</span>
+      <span class="text-slate-300">●</span>
+      <span data-i18n="steps.run">Run</span>
+      <span class="text-slate-300">●</span>
+      <span data-i18n="steps.results">Results</span>
+    </div>
+
+    <div class="text-left text-sm text-slate-600 space-y-2 mb-6">
+      <p class="text-xs uppercase tracking-[0.2em] text-slate-400" data-i18n="how.title">How it works</p>
+      <ul class="space-y-1 list-disc list-inside">
+        <li data-i18n="how.line1">Sit 50–70 cm from the screen.</li>
+        <li data-i18n="how.line2">Follow the dots during calibration.</li>
+        <li data-i18n="how.line3">Keep your head steady for best results.</li>
+        <li data-i18n="how.line4">Test lasts about 60 seconds.</li>
+      </ul>
+    </div>
     <button id="beginBtn"
             class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-3 px-8 rounded-2xl shadow-lg transform transition hover:scale-105">
-      Почати тест
+      <span data-i18n="buttons.start">Почати тест</span>
     </button>
     <button id="skipBtn"
             class="mt-4 block w-full border border-slate-200 text-slate-700 py-2.5 px-8 rounded-2xl shadow-sm hover:bg-slate-50 transition">
-      Demo results
+      <span data-i18n="buttons.demo">Demo results</span>
     </button>
+    <p class="text-xs text-slate-400 mt-4" data-i18n="footer.trust">Local demo • Data stays on device</p>
   </div>
 
   <canvas id="displayCanvas" style="display:none;"></canvas>
@@ -73,71 +133,71 @@
     <img id="imgRight" class="slide-img" src="" alt="right" />
   </div>
 
-  <div id="thankYou" class="hidden bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
-    <h2 class="text-3xl font-bold text-gray-800 mb-4">Дякуємо за проходження тесту!</h2>
+  <div id="thankYou" class="hidden card p-8 rounded-2xl text-center max-w-md w-full">
+    <h2 class="text-3xl font-bold text-gray-800 mb-4" data-i18n="thank.title">Дякуємо за проходження тесту!</h2>
     <button id="restartBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow transform transition hover:scale-105">
-      На головну
+      <span data-i18n="buttons.home">На головну</span>
     </button>
   </div>
 
-  <div id="resultsScreen" class="hidden w-full h-full results-bg grid-overlay overflow-auto">
+  <div id="resultsScreen" class="hidden w-full h-full app-bg grid-overlay overflow-auto">
     <div class="max-w-6xl mx-auto px-6 py-10">
       <div class="flex items-center justify-between mb-8">
         <div>
-          <p class="text-sm uppercase tracking-[0.2em] text-slate-500">Session Summary</p>
-          <h2 class="text-4xl font-bold text-slate-900">Attention Bias Results</h2>
+          <p class="text-sm uppercase tracking-[0.2em] text-slate-500" data-i18n="results.summary">Session Summary</p>
+          <h2 class="text-4xl font-bold text-slate-900" data-i18n="results.title">Attention Bias Results</h2>
         </div>
         <button id="resultsHomeBtn" class="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg hover:bg-slate-800 transition">
-          На головну
+          <span data-i18n="buttons.home">На головну</span>
         </button>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div class="card rounded-3xl p-5 fade-in delay-1">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Attention Score</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.attentionScore">Attention Score</p>
           <p id="metricScore" class="text-3xl font-bold text-slate-900">84</p>
-          <p class="text-sm text-slate-500 mt-1">High sustained focus</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.attentionCaption">High sustained focus</p>
         </div>
         <div class="card rounded-3xl p-5 fade-in delay-2">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Bias Direction</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.biasDirection">Bias Direction</p>
           <p id="metricBias" class="text-3xl font-bold text-slate-900">Right</p>
-          <p class="text-sm text-slate-500 mt-1">+12% toward target</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.biasCaption">+12% toward target</p>
         </div>
         <div class="card rounded-3xl p-5 fade-in delay-3">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Avg Fixation</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.avgFixation">Avg Fixation</p>
           <p id="metricFixation" class="text-3xl font-bold text-slate-900">310 ms</p>
-          <p class="text-sm text-slate-500 mt-1">Stable visual attention</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.fixationCaption">Stable visual attention</p>
         </div>
         <div class="card rounded-3xl p-5 fade-in delay-4">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Latency</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2" data-i18n="results.latency">Latency</p>
           <p id="metricLatency" class="text-3xl font-bold text-slate-900">420 ms</p>
-          <p class="text-sm text-slate-500 mt-1">Time to first fixation</p>
+          <p class="text-sm text-slate-500 mt-1" data-i18n="results.latencyCaption">Time to first fixation</p>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="card rounded-3xl p-6 lg:col-span-2 fade-in delay-1">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-semibold text-slate-900">Engagement Timeline</h3>
-            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Placeholder</span>
+            <h3 class="text-xl font-semibold text-slate-900" data-i18n="results.engagement">Engagement Timeline</h3>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400" data-i18n="results.placeholder">Placeholder</span>
           </div>
           <canvas id="timelineChart" class="w-full h-48"></canvas>
         </div>
         <div class="card rounded-3xl p-6 fade-in delay-2">
-          <h3 class="text-xl font-semibold text-slate-900 mb-4">Target Balance</h3>
+          <h3 class="text-xl font-semibold text-slate-900 mb-4" data-i18n="results.targetBalance">Target Balance</h3>
           <canvas id="balanceChart" class="w-full h-48"></canvas>
-          <p class="text-sm text-slate-500 mt-3">Time on left vs right stimulus</p>
+          <p class="text-sm text-slate-500 mt-3" data-i18n="results.balanceCaption">Time on left vs right stimulus</p>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div class="card rounded-3xl p-6 fade-in delay-3">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-semibold text-slate-900">Heatmap Overlay</h3>
-            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Demo</span>
+            <h3 class="text-xl font-semibold text-slate-900" data-i18n="results.heatmap">Heatmap Overlay</h3>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400" data-i18n="results.demo">Demo</span>
           </div>
           <div class="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
-            <span>Slide</span>
+            <span data-i18n="results.slide">Slide</span>
             <div class="flex items-center gap-3">
               <input id="heatmapSlider" type="range" min="1" max="10" value="1" class="accent-slate-900 w-36" />
               <span id="heatmapSlideLabel">01</span>
@@ -152,19 +212,19 @@
           </div>
         </div>
         <div class="card rounded-3xl p-6 fade-in delay-4">
-          <h3 class="text-xl font-semibold text-slate-900 mb-4">Key Findings</h3>
+          <h3 class="text-xl font-semibold text-slate-900 mb-4" data-i18n="results.keyFindings">Key Findings</h3>
           <div class="space-y-4 text-slate-600">
             <div class="flex items-start gap-3">
               <div class="w-2 h-2 rounded-full bg-emerald-500 mt-2"></div>
-              <p>Attention favored the right stimulus group with a consistent gaze density.</p>
+              <p data-i18n="results.finding1">Attention favored the right stimulus group with a consistent gaze density.</p>
             </div>
             <div class="flex items-start gap-3">
               <div class="w-2 h-2 rounded-full bg-amber-500 mt-2"></div>
-              <p>Peak engagement occurred between 8–14 seconds of the session.</p>
+              <p data-i18n="results.finding2">Peak engagement occurred between 8–14 seconds of the session.</p>
             </div>
             <div class="flex items-start gap-3">
               <div class="w-2 h-2 rounded-full bg-indigo-500 mt-2"></div>
-              <p>Fixation pattern suggests exploratory scanning before stabilization.</p>
+              <p data-i18n="results.finding3">Fixation pattern suggests exploratory scanning before stabilization.</p>
             </div>
           </div>
         </div>
@@ -172,11 +232,11 @@
     </div>
   </div>
   <div id="errorBanner" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center">
-    <div class="bg-white p-6 rounded-2xl shadow-xl max-w-md text-center">
-      <h3 class="text-2xl font-bold text-gray-800 mb-2">Помилка</h3>
-      <p id="errorMessage" class="text-gray-600 mb-4">Сталася помилка під час тесту.</p>
+    <div class="card p-6 rounded-2xl max-w-md text-center">
+      <h3 class="text-2xl font-bold text-gray-800 mb-2" data-i18n="error.title">Помилка</h3>
+      <p id="errorMessage" class="text-gray-600 mb-4" data-i18n="error.generic">Сталася помилка під час тесту.</p>
       <button id="errorHomeBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow">
-        На головну
+        <span data-i18n="buttons.home">На головну</span>
       </button>
     </div>
   </div>
@@ -193,6 +253,9 @@ const heatmapSlider = document.getElementById('heatmapSlider');
 const heatmapSlideLabel = document.getElementById('heatmapSlideLabel');
 const heatmapImageLeft = document.getElementById('heatmapImageLeft');
 const heatmapImageRight = document.getElementById('heatmapImageRight');
+const langButtons = document.querySelectorAll('[data-lang]');
+const pageHeader = document.getElementById('pageHeader');
+let currentLang = 'ua';
 const errorBanner = document.getElementById('errorBanner');
 const errorMessage = document.getElementById('errorMessage');
 
@@ -206,7 +269,45 @@ let calibrationActive = false;
 let currentCalibrationInfo = null;
 let currentFPS = 0;
 
+function isTestRunning() {
+    return calibrationActive || slideInterval || canvas.style.display === 'block' || slidesDiv.style.display === 'flex';
+}
+
+function abortTest() {
+    if (slideInterval) {
+        clearInterval(slideInterval);
+        slideInterval = null;
+    }
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+    calibrationActive = false;
+    Animator.stop();
+    currentSlide = 0;
+    canvas.style.display = 'none';
+    slidesDiv.style.display = 'none';
+    resultsScreen.classList.add('hidden');
+    thankYou.style.display = 'none';
+    errorBanner.classList.add('hidden');
+    startScreen.style.display = 'block';
+    if (pageHeader) {
+        pageHeader.classList.remove('hidden');
+    }
+    fetch('/finish');
+    if (document.exitFullscreen) {
+        document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+    }
+}
+
 document.addEventListener('keydown', (event) => {
+    if (event.code === 'Escape' && isTestRunning()) {
+        event.preventDefault();
+        abortTest();
+        return;
+    }
     if (calibrationActive && event.code === 'Space' && !event.repeat) {
         if(socket) socket.emit('user_input', { 'space_down': true });
         event.preventDefault();
@@ -234,7 +335,6 @@ function setupSocketListeners() {
         if (currentPhase !== prevPhase) {
             Animator.setPhase(currentPhase);
         }
-
         if (currentPhase === 'point_completed' && prevPhase !== 'point_completed') {
             const [x, y] = data.display_info.target_point;
             Animator.triggerCompletionEffect(x, y);
@@ -254,7 +354,7 @@ function setupSocketListeners() {
         console.error('Calibration Error:', data.message);
         calibrationActive = false;
         Animator.stop();
-        showError(data.message || 'Помилка калібрування');
+        showError(data.message || 'error.calibration');
     });
 
     socket.on('disconnect', () => {
@@ -262,13 +362,13 @@ function setupSocketListeners() {
         const wasActive = calibrationActive;
         calibrationActive = false;
         if (wasActive) {
-            showError('Зʼєднання втрачено');
+            showError('error.connection');
         }
     });
 
     socket.on('connect_error', (err) => {
         console.error('Socket connection error', err);
-        showError('Не вдалося підʼєднатися до сервера');
+        showError('error.connect');
     });
 }
 
@@ -329,6 +429,9 @@ async function showResults() {
     startScreen.style.display='none';
     thankYou.style.display='none';
     slidesDiv.style.display='none';
+    if (pageHeader) {
+        pageHeader.classList.remove('hidden');
+    }
     renderPlaceholderAnalytics();
 }
 
@@ -346,7 +449,9 @@ beginBtn.onclick = () => {
         canvas.style.display='block';
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-
+        if (pageHeader) {
+            pageHeader.classList.add('hidden');
+        }
         socket = io();
         setupSocketListeners();
         
@@ -380,19 +485,25 @@ document.getElementById('errorHomeBtn').onclick = () => {
 };
 
 function showError(message) {
-    errorMessage.textContent = message;
+    const translated = translations[currentLang]?.[message] || message;
+    errorMessage.textContent = translated;
     errorBanner.classList.remove('hidden');
     canvas.style.display='none';
     slidesDiv.style.display='none';
     startScreen.style.display='none';
     thankYou.style.display='none';
     resultsScreen.classList.add('hidden');
+    if (pageHeader) {
+        pageHeader.classList.remove('hidden');
+    }
 }
 
 function renderPlaceholderAnalytics() {
     const seed = Date.now() % 1000;
     const attentionScore = 78 + (seed % 20);
-    const biasDirection = attentionScore % 2 === 0 ? 'Right' : 'Left';
+    const biasDirection = attentionScore % 2 === 0
+        ? (translations[currentLang]?.["results.directionRight"] || "Right")
+        : (translations[currentLang]?.["results.directionLeft"] || "Left");
     const fixation = 280 + (seed % 120);
     const latency = 380 + (seed % 160);
 
@@ -522,6 +633,143 @@ function drawHeatmap(canvasId, points) {
         ctx.fill();
     });
 }
+
+const translations = {
+    ua: {
+        "nav.main": "Головна",
+        "nav.test": "Тест",
+        "nav.analytics": "Аналітика",
+        "hero.title": "Інсайти упередження уваги",
+        "hero.subtitle": "Вимірюємо увагу за поглядом менш ніж за 60 секунд.",
+        "chips.bias": "Індекс упередження",
+        "chips.latency": "Затримка",
+        "chips.heatmap": "Теплова мапа",
+        "preview.label": "Попередній перегляд",
+        "preview.heatmap": "Накладення теплової мапи",
+        "quality.label": "Якість",
+        "quality.caption": "Якість калібрування",
+        "steps.calibrate": "Калібрування",
+        "steps.run": "Тест",
+        "steps.results": "Результати",
+        "how.title": "Як це працює",
+        "how.line1": "Сядьте на відстані 50–70 см від екрана.",
+        "how.line2": "Слідкуйте за точками під час калібрування.",
+        "how.line3": "Тримайте голову нерухомою для точності.",
+        "how.line4": "Тест триває близько 60 секунд.",
+        "buttons.start": "Почати тест",
+        "buttons.demo": "Демо результати",
+        "buttons.home": "На головну",
+        "footer.trust": "Локальна демонстрація • Дані залишаються на пристрої",
+        "thank.title": "Дякуємо за проходження тесту!",
+        "results.summary": "Підсумок сесії",
+        "results.title": "Результати упередження уваги",
+        "results.attentionScore": "Індекс уваги",
+        "results.attentionCaption": "Висока стійка увага",
+        "results.biasDirection": "Напрям упередження",
+        "results.biasCaption": "+12% у бік цілі",
+        "results.directionRight": "Праворуч",
+        "results.directionLeft": "Ліворуч",
+        "results.avgFixation": "Середня фіксація",
+        "results.fixationCaption": "Стабільна зорова увага",
+        "results.latency": "Затримка",
+        "results.latencyCaption": "Час до першої фіксації",
+        "results.engagement": "Динаміка залученості",
+        "results.placeholder": "Демо",
+        "results.targetBalance": "Баланс цілей",
+        "results.balanceCaption": "Час на лівому та правому стимулі",
+        "results.heatmap": "Накладення теплової мапи",
+        "results.demo": "Демо",
+        "results.slide": "Слайд",
+        "results.keyFindings": "Ключові висновки",
+        "results.finding1": "Увага частіше фокусувалась на правій групі стимулів.",
+        "results.finding2": "Пік залученості спостерігався між 8–14 секундами.",
+        "results.finding3": "Патерн фіксацій свідчить про пошукове сканування.",
+        "error.title": "Помилка",
+        "error.generic": "Сталася помилка під час тесту.",
+        "error.calibration": "Помилка калібрування",
+        "error.connection": "Зʼєднання втрачено",
+        "error.connect": "Не вдалося підʼєднатися до сервера"
+    },
+    en: {
+        "nav.main": "Main",
+        "nav.test": "Test",
+        "nav.analytics": "Analytics",
+        "hero.title": "Attention Bias Insights",
+        "hero.subtitle": "Measure gaze-driven attention in under 60 seconds.",
+        "chips.bias": "Bias Score",
+        "chips.latency": "Latency",
+        "chips.heatmap": "Heatmap",
+        "preview.label": "Preview",
+        "preview.heatmap": "Heatmap overlay",
+        "quality.label": "Quality",
+        "quality.caption": "Calibration fit",
+        "steps.calibrate": "Calibrate",
+        "steps.run": "Run",
+        "steps.results": "Results",
+        "how.title": "How it works",
+        "how.line1": "Sit 50–70 cm from the screen.",
+        "how.line2": "Follow the dots during calibration.",
+        "how.line3": "Keep your head steady for best results.",
+        "how.line4": "Test lasts about 60 seconds.",
+        "buttons.start": "Start test",
+        "buttons.demo": "Demo results",
+        "buttons.home": "Back to home",
+        "footer.trust": "Local demo • Data stays on device",
+        "thank.title": "Thanks for completing the test!",
+        "results.summary": "Session Summary",
+        "results.title": "Attention Bias Results",
+        "results.attentionScore": "Attention Score",
+        "results.attentionCaption": "High sustained focus",
+        "results.biasDirection": "Bias Direction",
+        "results.biasCaption": "+12% toward target",
+        "results.directionRight": "Right",
+        "results.directionLeft": "Left",
+        "results.avgFixation": "Avg Fixation",
+        "results.fixationCaption": "Stable visual attention",
+        "results.latency": "Latency",
+        "results.latencyCaption": "Time to first fixation",
+        "results.engagement": "Engagement Timeline",
+        "results.placeholder": "Placeholder",
+        "results.targetBalance": "Target Balance",
+        "results.balanceCaption": "Time on left vs right stimulus",
+        "results.heatmap": "Heatmap Overlay",
+        "results.demo": "Demo",
+        "results.slide": "Slide",
+        "results.keyFindings": "Key Findings",
+        "results.finding1": "Attention favored the right stimulus group with a consistent gaze density.",
+        "results.finding2": "Peak engagement occurred between 8–14 seconds of the session.",
+        "results.finding3": "Fixation pattern suggests exploratory scanning before stabilization.",
+        "error.title": "Error",
+        "error.generic": "An error occurred during the test.",
+        "error.calibration": "Calibration error",
+        "error.connection": "Connection lost",
+        "error.connect": "Unable to connect to server"
+    }
+};
+
+function applyLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    document.documentElement.lang = lang === 'ua' ? 'uk' : 'en';
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.dataset.i18n;
+        if (translations[lang] && translations[lang][key]) {
+            el.textContent = translations[lang][key];
+        }
+    });
+    langButtons.forEach(btn => {
+        const isActive = btn.dataset.lang === lang;
+        btn.classList.toggle('bg-slate-900', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('text-slate-600', !isActive);
+    });
+}
+
+langButtons.forEach((btn) => {
+    btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
+});
+
+applyLanguage(localStorage.getItem('lang') || 'ua');
 </script>
 </body>
 </html>

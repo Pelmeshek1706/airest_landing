@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIREST Analytics Summary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Space Grotesk', sans-serif; }
+    .app-bg {
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(255, 244, 214, 0.8), transparent 60%),
+                  radial-gradient(900px 500px at 90% 10%, rgba(200, 240, 255, 0.7), transparent 60%),
+                  linear-gradient(160deg, #f8fafc 0%, #f1f5f9 45%, #e2e8f0 100%);
+    }
+    .grid-overlay {
+      background-image:
+        linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    }
+    .header-blur {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .section-title {
+      letter-spacing: 0.3em;
+    }
+  </style>
+</head>
+<body class="app-bg grid-overlay text-slate-900">
+  <header class="fixed top-0 left-0 right-0 z-50 header-blur">
+    <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <span class="text-xs uppercase tracking-[0.3em] text-slate-500">AIREST</span>
+        <nav class="flex items-center gap-4 text-sm text-slate-600">
+          <a href="/" class="hover:text-slate-900" data-i18n="nav.main">Main</a>
+          <a href="/test" class="hover:text-slate-900" data-i18n="nav.test">Test</a>
+          <a href="/analytics_summary" class="hover:text-slate-900" data-i18n="nav.analytics">Analytics</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-1 py-1 shadow-sm">
+        <button type="button" data-lang="ua" class="px-3 py-1 text-xs font-semibold rounded-full">UA</button>
+        <button type="button" data-lang="en" class="px-3 py-1 text-xs font-semibold rounded-full">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="pt-24 pb-20">
+    <section class="max-w-6xl mx-auto px-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+        <div>
+          <p class="text-xs uppercase section-title text-slate-500 mb-4" data-i18n="hero.badge">Analytics summary</p>
+          <h1 class="text-4xl md:text-5xl font-bold text-slate-900 mb-4" data-i18n="hero.title">AIREST Insights Dashboard</h1>
+          <p class="text-base text-slate-600 mb-6" data-i18n="hero.subtitle">A consolidated view of attention bias and speech biomarkers with clear, investor-friendly insights.</p>
+          <div class="flex flex-wrap gap-3">
+            <a href="/test" class="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg hover:bg-slate-800 transition" data-i18n="hero.ctaPrimary">Run a new demo</a>
+            <button type="button" class="bg-white/80 border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl shadow-sm" data-i18n="hero.ctaSecondary">Download report</button>
+          </div>
+        </div>
+        <div class="card p-6 rounded-3xl">
+          <p class="text-xs uppercase section-title text-slate-500 mb-4" data-i18n="hero.snapshot">Session snapshot</p>
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-slate-500" data-i18n="hero.snapshot1.label">Last run</p>
+              <p class="font-semibold">12:42</p>
+            </div>
+            <div>
+              <p class="text-slate-500" data-i18n="hero.snapshot2.label">Protocol length</p>
+              <p class="font-semibold">11 min</p>
+            </div>
+            <div>
+              <p class="text-slate-500" data-i18n="hero.snapshot3.label">Confidence</p>
+              <p class="font-semibold">High</p>
+            </div>
+            <div>
+              <p class="text-slate-500" data-i18n="hero.snapshot4.label">Signals captured</p>
+              <p class="font-semibold">Face • Voice • Text</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 mt-16">
+      <p class="text-xs uppercase section-title text-slate-500 mb-6" data-i18n="kpi.title">Session overview</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="card p-5 rounded-2xl">
+          <p class="text-2xl font-bold">124</p>
+          <p class="text-xs text-slate-500" data-i18n="kpi.card1">Sessions analyzed</p>
+        </div>
+        <div class="card p-5 rounded-2xl">
+          <p class="text-2xl font-bold">82/100</p>
+          <p class="text-xs text-slate-500" data-i18n="kpi.card2">Avg attention score</p>
+        </div>
+        <div class="card p-5 rounded-2xl">
+          <p class="text-2xl font-bold">+14%</p>
+          <p class="text-xs text-slate-500" data-i18n="kpi.card3">Bias toward target</p>
+        </div>
+        <div class="card p-5 rounded-2xl">
+          <p class="text-2xl font-bold">0.71</p>
+          <p class="text-xs text-slate-500" data-i18n="kpi.card4">Speech clarity index</p>
+        </div>
+        <div class="card p-5 rounded-2xl">
+          <p class="text-2xl font-bold">Low</p>
+          <p class="text-xs text-slate-500" data-i18n="kpi.card5">Risk flag</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 mt-16">
+      <p class="text-xs uppercase section-title text-slate-500 mb-6" data-i18n="attention.title">Attention analytics</p>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6 rounded-3xl">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-sm font-semibold" data-i18n="attention.heatmap.title">Heatmap overview</p>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400" data-i18n="attention.demo">Demo</span>
+          </div>
+          <div class="h-56 rounded-2xl bg-gradient-to-br from-amber-400/30 via-rose-400/20 to-sky-400/20 border border-white/60"></div>
+          <p class="text-xs text-slate-500 mt-4" data-i18n="attention.heatmap.caption">Density shows higher focus on threat cues during the first 12 seconds.</p>
+        </div>
+        <div class="grid gap-4">
+          <div class="card p-5 rounded-2xl">
+            <p class="text-xs uppercase text-slate-500" data-i18n="attention.metrics.title">Key metrics</p>
+            <div class="grid grid-cols-2 gap-3 text-sm mt-3">
+              <div>
+                <p class="text-slate-500" data-i18n="attention.metrics.item1">First fixation</p>
+                <p class="font-semibold">1.6s</p>
+              </div>
+              <div>
+                <p class="text-slate-500" data-i18n="attention.metrics.item2">Dwell time</p>
+                <p class="font-semibold">57%</p>
+              </div>
+              <div>
+                <p class="text-slate-500" data-i18n="attention.metrics.item3">Saccade stability</p>
+                <p class="font-semibold">0.82</p>
+              </div>
+              <div>
+                <p class="text-slate-500" data-i18n="attention.metrics.item4">Calibration fit</p>
+                <p class="font-semibold">Good</p>
+              </div>
+            </div>
+          </div>
+          <div class="card p-5 rounded-2xl">
+            <p class="text-xs uppercase text-slate-500 mb-2" data-i18n="attention.insights.title">Insights</p>
+            <ul class="text-sm text-slate-600 space-y-2">
+              <li data-i18n="attention.insights.line1">Attention shifts stabilize after slide 3.</li>
+              <li data-i18n="attention.insights.line2">Left-right balance improves with guided prompts.</li>
+              <li data-i18n="attention.insights.line3">Outlier frames: 4% (blink detection).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 mt-16">
+      <p class="text-xs uppercase section-title text-slate-500 mb-6" data-i18n="speech.title">Speech analytics</p>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6 rounded-3xl">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-sm font-semibold" data-i18n="speech.wave.title">Voice signal & sentiment</p>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400" data-i18n="speech.demo">Demo</span>
+          </div>
+          <div class="h-56 rounded-2xl bg-gradient-to-r from-indigo-500/30 via-slate-900/10 to-emerald-400/20 border border-white/60"></div>
+          <p class="text-xs text-slate-500 mt-4" data-i18n="speech.wave.caption">Prosody remains steady with moderate energy peaks in free speech.</p>
+        </div>
+        <div class="grid gap-4">
+          <div class="card p-5 rounded-2xl">
+            <p class="text-xs uppercase text-slate-500" data-i18n="speech.metrics.title">Key metrics</p>
+            <div class="grid grid-cols-2 gap-3 text-sm mt-3">
+              <div>
+                <p class="text-slate-500" data-i18n="speech.metrics.item1">Speech rate</p>
+                <p class="font-semibold">136 wpm</p>
+              </div>
+              <div>
+                <p class="text-slate-500" data-i18n="speech.metrics.item2">Pauses</p>
+                <p class="font-semibold">1.8 / min</p>
+              </div>
+              <div>
+                <p class="text-slate-500" data-i18n="speech.metrics.item3">Pitch variance</p>
+                <p class="font-semibold">0.62</p>
+              </div>
+              <div>
+                <p class="text-slate-500" data-i18n="speech.metrics.item4">Sentiment balance</p>
+                <p class="font-semibold">Neutral+</p>
+              </div>
+            </div>
+          </div>
+          <div class="card p-5 rounded-2xl">
+            <p class="text-xs uppercase text-slate-500 mb-2" data-i18n="speech.insights.title">Insights</p>
+            <ul class="text-sm text-slate-600 space-y-2">
+              <li data-i18n="speech.insights.line1">Stable articulation during sustained phonation.</li>
+              <li data-i18n="speech.insights.line2">Lower energy during reflective prompts.</li>
+              <li data-i18n="speech.insights.line3">High transcript confidence in 92% of samples.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 mt-16">
+      <p class="text-xs uppercase section-title text-slate-500 mb-6" data-i18n="timeline.title">Insight pipeline</p>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs text-slate-600">
+        <div class="card p-4 rounded-2xl" data-i18n="timeline.step1">Capture signals</div>
+        <div class="card p-4 rounded-2xl" data-i18n="timeline.step2">Clean & normalize</div>
+        <div class="card p-4 rounded-2xl" data-i18n="timeline.step3">Model scoring</div>
+        <div class="card p-4 rounded-2xl" data-i18n="timeline.step4">Clinical mapping</div>
+        <div class="card p-4 rounded-2xl" data-i18n="timeline.step5">Report & monitoring</div>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 mt-16">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6 rounded-3xl">
+          <p class="text-xs uppercase section-title text-slate-500 mb-4" data-i18n="quality.title">Quality & reliability</p>
+          <ul class="text-sm text-slate-600 space-y-3">
+            <li data-i18n="quality.line1">Camera coverage: 94% valid frames</li>
+            <li data-i18n="quality.line2">Audio SNR: 27 dB (good)</li>
+            <li data-i18n="quality.line3">Model confidence: 0.81 avg</li>
+            <li data-i18n="quality.line4">Privacy: local-first processing, no cloud upload</li>
+          </ul>
+        </div>
+        <div class="card p-6 rounded-3xl">
+          <p class="text-xs uppercase section-title text-slate-500 mb-4" data-i18n="recommend.title">Recommended next steps</p>
+          <ul class="text-sm text-slate-600 space-y-3">
+            <li data-i18n="recommend.line1">Repeat test in 7 days to confirm stability.</li>
+            <li data-i18n="recommend.line2">Share summary with clinician for baseline review.</li>
+            <li data-i18n="recommend.line3">Enable longitudinal monitoring for treatment response.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 mt-16">
+      <div class="card p-8 rounded-3xl text-center">
+        <h2 class="text-3xl font-bold mb-2" data-i18n="cta.title">Ready for a deeper pilot?</h2>
+        <p class="text-sm text-slate-500 mb-4" data-i18n="cta.subtitle">We can tailor the analytics for clinics, employers, or insurers.</p>
+        <div class="flex flex-wrap justify-center gap-3">
+          <a href="mailto:hello@airest.health" class="bg-slate-900 text-white px-6 py-2 rounded-2xl" data-i18n="cta.primary">Contact AIREST</a>
+          <a href="/test" class="bg-white/80 border border-slate-200 text-slate-700 px-6 py-2 rounded-2xl" data-i18n="cta.secondary">Open demo</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const langButtons = document.querySelectorAll('[data-lang]');
+    let currentLang = 'ua';
+
+    const translations = {
+      ua: {
+        "nav.main": "Головна",
+        "nav.test": "Тест",
+        "nav.analytics": "Аналітика",
+        "hero.badge": "Звіт аналітики",
+        "hero.title": "Дашборд інсайтів AIREST",
+        "hero.subtitle": "Консолідований огляд уваги та мовленнєвих біомаркерів з інвесторськими інсайтами.",
+        "hero.ctaPrimary": "Запустити нову демо-сесію",
+        "hero.ctaSecondary": "Завантажити звіт",
+        "hero.snapshot": "Сесія",
+        "hero.snapshot1.label": "Останній запуск",
+        "hero.snapshot2.label": "Тривалість протоколу",
+        "hero.snapshot3.label": "Довіра",
+        "hero.snapshot4.label": "Сигнали",
+        "kpi.title": "Огляд сесій",
+        "kpi.card1": "Проаналізовано сесій",
+        "kpi.card2": "Середній бал уваги",
+        "kpi.card3": "Зміщення до цілі",
+        "kpi.card4": "Індекс чіткості мовлення",
+        "kpi.card5": "Ризиковий прапорець",
+        "attention.title": "Аналітика уваги",
+        "attention.heatmap.title": "Огляд теплової мапи",
+        "attention.demo": "Демо",
+        "attention.heatmap.caption": "Щільність фокусу зростає на загрозливих сигналах у перші 12 секунд.",
+        "attention.metrics.title": "Ключові метрики",
+        "attention.metrics.item1": "Перша фіксація",
+        "attention.metrics.item2": "Час утримання",
+        "attention.metrics.item3": "Стабільність саккад",
+        "attention.metrics.item4": "Якість калібрування",
+        "attention.insights.title": "Інсайти",
+        "attention.insights.line1": "Зміщення стабілізується після 3-го слайда.",
+        "attention.insights.line2": "Баланс ліворуч/праворуч покращується з підказками.",
+        "attention.insights.line3": "Викиди: 4% кадрів (миготіння).",
+        "speech.title": "Аналітика мовлення",
+        "speech.wave.title": "Голосовий сигнал та сентимент",
+        "speech.demo": "Демо",
+        "speech.wave.caption": "Просодія стабільна з помірними піками енергії у вільному мовленні.",
+        "speech.metrics.title": "Ключові метрики",
+        "speech.metrics.item1": "Швидкість мовлення",
+        "speech.metrics.item2": "Паузи",
+        "speech.metrics.item3": "Варіативність висоти",
+        "speech.metrics.item4": "Баланс настрою",
+        "speech.insights.title": "Інсайти",
+        "speech.insights.line1": "Стабільна артикуляція у фонації.",
+        "speech.insights.line2": "Нижча енергія на рефлексивних питаннях.",
+        "speech.insights.line3": "Довіра до транскрипції у 92% зразків.",
+        "timeline.title": "Пайплайн інсайтів",
+        "timeline.step1": "Збір сигналів",
+        "timeline.step2": "Очищення та нормалізація",
+        "timeline.step3": "Скоринг моделей",
+        "timeline.step4": "Клінічне відображення",
+        "timeline.step5": "Звіт та моніторинг",
+        "quality.title": "Якість та надійність",
+        "quality.line1": "Покриття камери: 94% валідних кадрів",
+        "quality.line2": "Audio SNR: 27 dB (добре)",
+        "quality.line3": "Довіра моделей: 0.81 в середньому",
+        "quality.line4": "Приватність: локальна обробка без хмари",
+        "recommend.title": "Рекомендовані кроки",
+        "recommend.line1": "Повторити тест через 7 днів для стабільності.",
+        "recommend.line2": "Поділитися звітом з клініцистом.",
+        "recommend.line3": "Увімкнути моніторинг динаміки лікування.",
+        "cta.title": "Готові до глибшого пілоту?",
+        "cta.subtitle": "Підлаштуємо аналітику для клінік, роботодавців чи страховиків.",
+        "cta.primary": "Зв’язатися з AIREST",
+        "cta.secondary": "Відкрити демо"
+      },
+      en: {
+        "nav.main": "Main",
+        "nav.test": "Test",
+        "nav.analytics": "Analytics",
+        "hero.badge": "Analytics summary",
+        "hero.title": "AIREST Insights Dashboard",
+        "hero.subtitle": "A consolidated view of attention bias and speech biomarkers with clear, investor-friendly insights.",
+        "hero.ctaPrimary": "Run a new demo",
+        "hero.ctaSecondary": "Download report",
+        "hero.snapshot": "Session snapshot",
+        "hero.snapshot1.label": "Last run",
+        "hero.snapshot2.label": "Protocol length",
+        "hero.snapshot3.label": "Confidence",
+        "hero.snapshot4.label": "Signals captured",
+        "kpi.title": "Session overview",
+        "kpi.card1": "Sessions analyzed",
+        "kpi.card2": "Avg attention score",
+        "kpi.card3": "Bias toward target",
+        "kpi.card4": "Speech clarity index",
+        "kpi.card5": "Risk flag",
+        "attention.title": "Attention analytics",
+        "attention.heatmap.title": "Heatmap overview",
+        "attention.demo": "Demo",
+        "attention.heatmap.caption": "Density shows higher focus on threat cues during the first 12 seconds.",
+        "attention.metrics.title": "Key metrics",
+        "attention.metrics.item1": "First fixation",
+        "attention.metrics.item2": "Dwell time",
+        "attention.metrics.item3": "Saccade stability",
+        "attention.metrics.item4": "Calibration fit",
+        "attention.insights.title": "Insights",
+        "attention.insights.line1": "Attention shifts stabilize after slide 3.",
+        "attention.insights.line2": "Left-right balance improves with guided prompts.",
+        "attention.insights.line3": "Outlier frames: 4% (blink detection).",
+        "speech.title": "Speech analytics",
+        "speech.wave.title": "Voice signal & sentiment",
+        "speech.demo": "Demo",
+        "speech.wave.caption": "Prosody remains steady with moderate energy peaks in free speech.",
+        "speech.metrics.title": "Key metrics",
+        "speech.metrics.item1": "Speech rate",
+        "speech.metrics.item2": "Pauses",
+        "speech.metrics.item3": "Pitch variance",
+        "speech.metrics.item4": "Sentiment balance",
+        "speech.insights.title": "Insights",
+        "speech.insights.line1": "Stable articulation during sustained phonation.",
+        "speech.insights.line2": "Lower energy during reflective prompts.",
+        "speech.insights.line3": "High transcript confidence in 92% of samples.",
+        "timeline.title": "Insight pipeline",
+        "timeline.step1": "Capture signals",
+        "timeline.step2": "Clean & normalize",
+        "timeline.step3": "Model scoring",
+        "timeline.step4": "Clinical mapping",
+        "timeline.step5": "Report & monitoring",
+        "quality.title": "Quality & reliability",
+        "quality.line1": "Camera coverage: 94% valid frames",
+        "quality.line2": "Audio SNR: 27 dB (good)",
+        "quality.line3": "Model confidence: 0.81 avg",
+        "quality.line4": "Privacy: local-first processing, no cloud upload",
+        "recommend.title": "Recommended next steps",
+        "recommend.line1": "Repeat test in 7 days to confirm stability.",
+        "recommend.line2": "Share summary with clinician for baseline review.",
+        "recommend.line3": "Enable longitudinal monitoring for treatment response.",
+        "cta.title": "Ready for a deeper pilot?",
+        "cta.subtitle": "We can tailor the analytics for clinics, employers, or insurers.",
+        "cta.primary": "Contact AIREST",
+        "cta.secondary": "Open demo"
+      }
+    };
+
+    function applyLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('lang', lang);
+      document.documentElement.lang = lang === 'ua' ? 'uk' : 'en';
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.dataset.i18n;
+        if (translations[lang] && translations[lang][key]) {
+          el.textContent = translations[lang][key];
+        }
+      });
+      langButtons.forEach(btn => {
+        const isActive = btn.dataset.lang === lang;
+        btn.classList.toggle('bg-slate-900', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('text-slate-600', !isActive);
+      });
+    }
+
+    langButtons.forEach((btn) => {
+      btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
+    });
+
+    applyLanguage(localStorage.getItem('lang') || 'ua');
+  </script>
+</body>
+</html>

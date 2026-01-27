@@ -96,6 +96,15 @@ async def attention(request: Request):
 @app.get('/speech', response_class=HTMLResponse)
 async def speech(request: Request):
     return templates.TemplateResponse('speech.html', {'request': request})
+
+@app.get('/test', response_class=HTMLResponse)
+async def test(request: Request):
+    return templates.TemplateResponse('test.html', {'request': request})
+
+@app.get('/analytics_summary', response_class=HTMLResponse)
+async def analytics_summary(request: Request):
+    return templates.TemplateResponse('analytics_summary.html', {'request': request})
+
 @app.get('/start_slides')
 async def start_slides():
     global recording, gaze_data
