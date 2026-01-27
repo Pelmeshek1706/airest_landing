@@ -1,5 +1,3 @@
-import cv2
-
 class Pupil(object):
     """
     This class represents the pupil position based on the iris center provided by MediaPipe.

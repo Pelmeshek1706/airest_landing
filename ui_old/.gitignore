@@ -1,6 +1,0 @@
-# bytecode caches
-__pycache__/
-*.py[cod]
-
-# IDE settings
-.idea/
