@@ -1,9 +1,0 @@
-mediapipe==0.10.20
-numpy==1.26.4
-opencv-python==4.6.0.66
-pandas==2.2.2
-pyobjc_framework_Cocoa==10.3.1
-Xlib==0.21
-fastapi==0.110.0
-uvicorn==0.29.0
-python-socketio==5.11.2
