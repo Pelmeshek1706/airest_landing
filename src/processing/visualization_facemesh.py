@@ -1,6 +1,7 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import os
 
 class FaceMeshVisualization:
     def __init__(self, input_video_path, output_video_path):
@@ -114,8 +115,10 @@ class FaceMeshVisualization:
         if self.out_video is not None:
             self.out_video.release()
 
-# Set the input and output paths and run the visualization
-input_video_path = 'output_videos/recorded_videos.mov'  # Path to your input video
-output_video_path = 'output_videos/output_landmark_visualization.mp4'  # Path to save the output
-face_mesh_vis = FaceMeshVisualization(input_video_path, output_video_path)
-face_mesh_vis.run()
+if __name__ == "__main__":
+    # Set the input and output paths and run the visualization
+    input_video_path = 'output_videos/recorded_videos.mov'  # Path to your input video
+    output_video_path = 'output_videos/output_landmark_visualization.mp4'  # Path to save the output
+    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
+    face_mesh_vis = FaceMeshVisualization(input_video_path, output_video_path)
+    face_mesh_vis.run()

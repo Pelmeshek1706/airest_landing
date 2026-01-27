@@ -5,11 +5,16 @@ import time
 import json
 import logging
 from collections import deque
+from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI, Request, UploadFile, File, Form
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+RESULTS_DIR = os.path.join(BASE_DIR, 'api_test_results')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULTS_DIR, exist_ok=True)
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -27,8 +32,15 @@ root_logger.addHandler(file_handler)
 root_logger.setLevel(logging.INFO)
 logging.getLogger('socketio').setLevel(logging.ERROR)
 
+# --- Lifespan ---
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    logging.info('Server shutdown: cleaning up resources')
+    await cleanup_resources()
+
 # --- FastAPI and Socket.IO Setup ---
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.mount('/static', StaticFiles(directory='web/static'), name='static')
 templates = Jinja2Templates(directory='web/templates')
 
@@ -54,6 +66,23 @@ recording = False
 gaze_data = []
 
 user_input_state = {'space_down': False}
+
+
+async def cleanup_resources():
+    global api, cap, calibration_active, recording
+    async with lock:
+        local_api = api
+        local_cap = cap
+        api = None
+        cap = None
+        calibration_active = False
+        recording = False
+        user_input_state['space_down'] = False
+    if local_cap:
+        local_cap.release()
+    if local_api:
+        local_api.stop()
+
 
 # --- Routes ---
 @app.get('/', response_class=HTMLResponse)
@@ -86,39 +115,36 @@ async def set_slide_route(idx: int):
 @app.get('/record_gaze')
 async def record_gaze_route(slide: int = 0):
     global gaze_data
-    if not recording:
-        return JSONResponse({'status': 'not_recording'})
+    async with lock:
+        if not recording or api is None or cap is None:
+            return JSONResponse({'status': 'not_recording'})
+        api_local = api
+        cap_local = cap
+        slide_idx = current_slide
 
     import cv2
-    ret, frame = await asyncio.to_thread(cap.read)
+    ret, frame = await asyncio.to_thread(cap_local.read)
     if not ret:
         return JSONResponse({'status': 'camera_error'})
 
     frame = cv2.flip(frame, 1)
-    gaze = await asyncio.to_thread(api.get_gaze, frame)
+    gaze = await asyncio.to_thread(api_local.get_gaze, frame)
     timestamp = time.time()
 
     async with lock:
-        gaze_data.append({'time': timestamp, 'slide': current_slide, 'x': gaze[0], 'y': gaze[1]})
+        gaze_data.append({'time': timestamp, 'slide': slide_idx, 'x': gaze[0], 'y': gaze[1]})
 
     return JSONResponse({'status': 'ok'})
 
 @app.get('/finish')
 async def finish():
-    global recording, api, cap, calibration_active
+    logging.info('Finishing test session')
     async with lock:
-        logging.info('Finishing test session')
-        recording = False
-        calibration_active = False
-        if cap:
-            cap.release()
-            cap = None
-        if api:
-            api.stop()
-            api = None
-        with open('api_test_results/web_gaze_data.json', 'w') as f:
-            json.dump(gaze_data, f)
-        logging.info('Gaze data saved to api_test_results/web_gaze_data.json')
+        snapshot = list(gaze_data)
+    with open(os.path.join(RESULTS_DIR, 'web_gaze_data.json'), 'w') as f:
+        json.dump(snapshot, f)
+    logging.info('Gaze data saved to api_test_results/web_gaze_data.json')
+    await cleanup_resources()
     return JSONResponse({'status': 'done'})
 
 @app.post('/upload')
@@ -136,6 +162,11 @@ async def upload(session_id: str = Form(...), events: str = Form('[]'), video_bl
 async def connect(sid, environ):
     logging.info(f'Client connected: {sid}')
 
+@sio.event
+async def disconnect(sid):
+    logging.info(f'Client disconnected: {sid}')
+    await cleanup_resources()
+
 @sio.on('start_test')
 async def handle_start_test(sid, data):
     global api, cap, calibration_active
@@ -150,11 +181,17 @@ async def handle_start_test(sid, data):
         width = int(data.get('width', 1280))
         height = int(data.get('height', 720))
         logging.info(f'Starting test with screen dimensions {width}x{height}')
-        api = GazeTrackerAPI(screen_width=width, screen_height=height)
-        api.start()
-        cap = cv2.VideoCapture(0)
-        cap.set(cv2.CAP_PROP_FPS, 30)
-        api.start_calibration(calibration_params)
+        api_local = GazeTrackerAPI(screen_width=width, screen_height=height)
+        api_local.start()
+        cap_local = cv2.VideoCapture(0)
+        if not cap_local.isOpened():
+            api_local.stop()
+            await sio.emit('calibration_error', {'message': 'Camera not available'}, to=sid)
+            return
+        cap_local.set(cv2.CAP_PROP_FPS, 30)
+        api_local.start_calibration(calibration_params)
+        api = api_local
+        cap = cap_local
         calibration_active = True
         sio.start_background_task(calibration_stream_task, sid)
     await sio.emit('test_started', to=sid)
@@ -167,19 +204,22 @@ async def calibration_stream_task(sid):
     while calibration_active:
         loop_start = time.time()
         async with lock:
-            if not api or not api.is_calibrating:
+            api_local = api
+            cap_local = cap
+            if not api_local or not api_local.is_calibrating:
                 calibration_active = False
                 break
             is_space_down = user_input_state.get('space_down', False)
         current_time = time.time()
-        ret, frame = await asyncio.to_thread(cap.read)
+        ret, frame = await asyncio.to_thread(cap_local.read)
         if not ret:
             logging.error('Failed to read frame from camera')
             await sio.emit('calibration_error', {'message': 'Camera error'}, to=sid)
+            await cleanup_resources()
             break
         frame = cv2.flip(frame, 1)
         status = await asyncio.to_thread(
-            api.process_calibration_step,
+            api_local.process_calibration_step,
             frame,
             user_input={'space_down': is_space_down},
         )
@@ -209,6 +249,6 @@ if __name__ == '__main__':
             return s.getsockname()[1]
 
     port = find_free_port()
-    logging.info(f'Starting ASGI server on port {port}. Open http://127.0.0.1:{port} in a browser')
+    logging.info(f'Starting ASGI server on port {port}. Open http://localhost:{port} in a browser')
     import uvicorn
-    uvicorn.run(app_sio, host='0.0.0.0', port=port)
+    uvicorn.run(app_sio, host='127.0.0.1', port=port)

@@ -4,9 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Attention Bias Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { margin:0; overflow:hidden; }
+    body { margin:0; overflow:hidden; font-family: 'Space Grotesk', sans-serif; }
     #displayCanvas {
       width:100vw; height:100vh; display:block;
       background:#f0f0f0; cursor:none;
@@ -16,6 +19,35 @@
       justify-content:center; align-items:center;
     }
     .slide-img { width:25vw; height:25vh; margin:0 2vw; object-fit:contain; }
+    .results-bg {
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(255, 244, 214, 0.8), transparent 60%),
+                  radial-gradient(900px 500px at 90% 10%, rgba(200, 240, 255, 0.7), transparent 60%),
+                  linear-gradient(160deg, #f8fafc 0%, #f1f5f9 45%, #e2e8f0 100%);
+    }
+    .grid-overlay {
+      background-image:
+        linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    }
+    .fade-in {
+      animation: fadeInUp 0.7s ease forwards;
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    .fade-in.delay-1 { animation-delay: 0.1s; }
+    .fade-in.delay-2 { animation-delay: 0.2s; }
+    .fade-in.delay-3 { animation-delay: 0.3s; }
+    .fade-in.delay-4 { animation-delay: 0.4s; }
+    @keyframes fadeInUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="{{ url_for('static', path='js/animations.js') }}" defer></script>
@@ -27,6 +59,10 @@
     <button id="beginBtn"
             class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-3 px-8 rounded-2xl shadow-lg transform transition hover:scale-105">
       Почати тест
+    </button>
+    <button id="skipBtn"
+            class="mt-4 block w-full border border-slate-200 text-slate-700 py-2.5 px-8 rounded-2xl shadow-sm hover:bg-slate-50 transition">
+      Demo results
     </button>
   </div>
 
@@ -43,6 +79,107 @@
       На головну
     </button>
   </div>
+
+  <div id="resultsScreen" class="hidden w-full h-full results-bg grid-overlay overflow-auto">
+    <div class="max-w-6xl mx-auto px-6 py-10">
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <p class="text-sm uppercase tracking-[0.2em] text-slate-500">Session Summary</p>
+          <h2 class="text-4xl font-bold text-slate-900">Attention Bias Results</h2>
+        </div>
+        <button id="resultsHomeBtn" class="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg hover:bg-slate-800 transition">
+          На головну
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="card rounded-3xl p-5 fade-in delay-1">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Attention Score</p>
+          <p id="metricScore" class="text-3xl font-bold text-slate-900">84</p>
+          <p class="text-sm text-slate-500 mt-1">High sustained focus</p>
+        </div>
+        <div class="card rounded-3xl p-5 fade-in delay-2">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Bias Direction</p>
+          <p id="metricBias" class="text-3xl font-bold text-slate-900">Right</p>
+          <p class="text-sm text-slate-500 mt-1">+12% toward target</p>
+        </div>
+        <div class="card rounded-3xl p-5 fade-in delay-3">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Avg Fixation</p>
+          <p id="metricFixation" class="text-3xl font-bold text-slate-900">310 ms</p>
+          <p class="text-sm text-slate-500 mt-1">Stable visual attention</p>
+        </div>
+        <div class="card rounded-3xl p-5 fade-in delay-4">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Latency</p>
+          <p id="metricLatency" class="text-3xl font-bold text-slate-900">420 ms</p>
+          <p class="text-sm text-slate-500 mt-1">Time to first fixation</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="card rounded-3xl p-6 lg:col-span-2 fade-in delay-1">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold text-slate-900">Engagement Timeline</h3>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Placeholder</span>
+          </div>
+          <canvas id="timelineChart" class="w-full h-48"></canvas>
+        </div>
+        <div class="card rounded-3xl p-6 fade-in delay-2">
+          <h3 class="text-xl font-semibold text-slate-900 mb-4">Target Balance</h3>
+          <canvas id="balanceChart" class="w-full h-48"></canvas>
+          <p class="text-sm text-slate-500 mt-3">Time on left vs right stimulus</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div class="card rounded-3xl p-6 fade-in delay-3">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold text-slate-900">Heatmap Overlay</h3>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Demo</span>
+          </div>
+          <div class="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
+            <span>Slide</span>
+            <div class="flex items-center gap-3">
+              <input id="heatmapSlider" type="range" min="1" max="10" value="1" class="accent-slate-900 w-36" />
+              <span id="heatmapSlideLabel">01</span>
+            </div>
+          </div>
+          <div class="relative rounded-2xl overflow-hidden bg-slate-900/5">
+            <div class="flex w-full h-56 items-center justify-center gap-6 px-4">
+              <img id="heatmapImageLeft" src="/static/slides/slide1_left.svg" alt="Stimulus left" class="w-1/2 h-full object-contain opacity-60" />
+              <img id="heatmapImageRight" src="/static/slides/slide1_right.svg" alt="Stimulus right" class="w-1/2 h-full object-contain opacity-60" />
+            </div>
+            <canvas id="heatmapCanvas" class="absolute inset-0 w-full h-full"></canvas>
+          </div>
+        </div>
+        <div class="card rounded-3xl p-6 fade-in delay-4">
+          <h3 class="text-xl font-semibold text-slate-900 mb-4">Key Findings</h3>
+          <div class="space-y-4 text-slate-600">
+            <div class="flex items-start gap-3">
+              <div class="w-2 h-2 rounded-full bg-emerald-500 mt-2"></div>
+              <p>Attention favored the right stimulus group with a consistent gaze density.</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-2 h-2 rounded-full bg-amber-500 mt-2"></div>
+              <p>Peak engagement occurred between 8–14 seconds of the session.</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-2 h-2 rounded-full bg-indigo-500 mt-2"></div>
+              <p>Fixation pattern suggests exploratory scanning before stabilization.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="errorBanner" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded-2xl shadow-xl max-w-md text-center">
+      <h3 class="text-2xl font-bold text-gray-800 mb-2">Помилка</h3>
+      <p id="errorMessage" class="text-gray-600 mb-4">Сталася помилка під час тесту.</p>
+      <button id="errorHomeBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow">
+        На головну
+      </button>
+    </div>
+  </div>
 <script>
 const beginBtn = document.getElementById('beginBtn');
 const startScreen = document.getElementById('startScreen');
@@ -51,6 +188,13 @@ const slidesDiv = document.getElementById('slides');
 const imgLeft = document.getElementById('imgLeft');
 const imgRight = document.getElementById('imgRight');
 const thankYou = document.getElementById('thankYou');
+const resultsScreen = document.getElementById('resultsScreen');
+const heatmapSlider = document.getElementById('heatmapSlider');
+const heatmapSlideLabel = document.getElementById('heatmapSlideLabel');
+const heatmapImageLeft = document.getElementById('heatmapImageLeft');
+const heatmapImageRight = document.getElementById('heatmapImageRight');
+const errorBanner = document.getElementById('errorBanner');
+const errorMessage = document.getElementById('errorMessage');
 
 let socket = null;
 let slideInterval = null;
@@ -110,11 +254,21 @@ function setupSocketListeners() {
         console.error('Calibration Error:', data.message);
         calibrationActive = false;
         Animator.stop();
+        showError(data.message || 'Помилка калібрування');
     });
 
     socket.on('disconnect', () => {
         console.log('Disconnected from server.');
+        const wasActive = calibrationActive;
         calibrationActive = false;
+        if (wasActive) {
+            showError('Зʼєднання втрачено');
+        }
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('Socket connection error', err);
+        showError('Не вдалося підʼєднатися до сервера');
     });
 }
 
@@ -159,13 +313,23 @@ function recordGaze() {
 function finishTest() {
     slideInterval = null;
     slidesDiv.style.display='none';
-    thankYou.style.display='block';
+    showResults();
     if (document.exitFullscreen) {
         document.exitFullscreen();
     } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen();
     }
     fetch('/finish');
+}
+
+async function showResults() {
+    await loadSlideCount();
+    resultsScreen.classList.remove('hidden');
+    canvas.style.display='none';
+    startScreen.style.display='none';
+    thankYou.style.display='none';
+    slidesDiv.style.display='none';
+    renderPlaceholderAnalytics();
 }
 
 beginBtn.onclick = () => {
@@ -205,6 +369,159 @@ beginBtn.onclick = () => {
 document.getElementById('restartBtn').onclick = () => {
     window.location.href = '/';
 };
+document.getElementById('resultsHomeBtn').onclick = () => {
+    window.location.href = '/';
+};
+document.getElementById('skipBtn').onclick = () => {
+    showResults();
+};
+document.getElementById('errorHomeBtn').onclick = () => {
+    window.location.href = '/';
+};
+
+function showError(message) {
+    errorMessage.textContent = message;
+    errorBanner.classList.remove('hidden');
+    canvas.style.display='none';
+    slidesDiv.style.display='none';
+    startScreen.style.display='none';
+    thankYou.style.display='none';
+    resultsScreen.classList.add('hidden');
+}
+
+function renderPlaceholderAnalytics() {
+    const seed = Date.now() % 1000;
+    const attentionScore = 78 + (seed % 20);
+    const biasDirection = attentionScore % 2 === 0 ? 'Right' : 'Left';
+    const fixation = 280 + (seed % 120);
+    const latency = 380 + (seed % 160);
+
+    document.getElementById('metricScore').textContent = attentionScore;
+    document.getElementById('metricBias').textContent = biasDirection;
+    document.getElementById('metricFixation').textContent = `${fixation} ms`;
+    document.getElementById('metricLatency').textContent = `${latency} ms`;
+
+    const timeline = Array.from({ length: 30 }, (_, i) => {
+        const base = 60 + 20 * Math.sin(i / 3);
+        return base + ((seed + i * 13) % 15);
+    });
+    drawLineChart('timelineChart', timeline);
+
+    const leftTime = 46 + (seed % 10);
+    const rightTime = 100 - leftTime;
+    drawBalanceChart('balanceChart', leftTime, rightTime);
+
+    setupHeatmapControls();
+}
+
+function setupCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const dpr = window.devicePixelRatio || 1;
+    const { width, height } = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(width * dpr));
+    canvas.height = Math.max(1, Math.floor(height * dpr));
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    return ctx;
+}
+
+function setupHeatmapControls() {
+    const safeTotal = Math.max(1, totalSlides || 1);
+    heatmapSlider.max = safeTotal;
+    const initialSlide = 1;
+    heatmapSlider.value = String(initialSlide);
+    updateHeatmapSlide(initialSlide);
+    heatmapSlider.oninput = (event) => {
+        const value = Number(event.target.value);
+        updateHeatmapSlide(value);
+    };
+}
+
+function updateHeatmapSlide(slideIndex) {
+    heatmapSlideLabel.textContent = String(slideIndex).padStart(2, '0');
+    heatmapImageLeft.src = `/static/slides/slide${slideIndex}_left.svg`;
+    heatmapImageRight.src = `/static/slides/slide${slideIndex}_right.svg`;
+    const heatmapPoints = generateHeatmapPoints(slideIndex);
+    drawHeatmap('heatmapCanvas', heatmapPoints);
+}
+
+function generateHeatmapPoints(slideIndex) {
+    let seed = slideIndex * 997;
+    const rand = () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+    };
+    return Array.from({ length: 18 }, (_, i) => ({
+        x: rand() * 100,
+        y: rand() * 100,
+        r: 16 + (i % 5) * 7,
+        intensity: 0.35 + rand() * 0.4
+    }));
+}
+
+function drawLineChart(canvasId, series) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = setupCanvas(canvasId);
+    const { width, height } = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, width, height);
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    series.forEach((v, i) => {
+        const x = (i / (series.length - 1)) * (width - 20) + 10;
+        const y = height - ((v - 40) / 60) * (height - 20) - 10;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.08)';
+    ctx.beginPath();
+    ctx.moveTo(10, height - 10);
+    series.forEach((v, i) => {
+        const x = (i / (series.length - 1)) * (width - 20) + 10;
+        const y = height - ((v - 40) / 60) * (height - 20) - 10;
+        ctx.lineTo(x, y);
+    });
+    ctx.lineTo(width - 10, height - 10);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawBalanceChart(canvasId, leftVal, rightVal) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = setupCanvas(canvasId);
+    const { width, height } = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, width, height);
+    const total = leftVal + rightVal;
+    const leftWidth = (leftVal / total) * (width - 40);
+    ctx.fillStyle = '#0ea5e9';
+    ctx.fillRect(20, height / 2 - 16, leftWidth, 32);
+    ctx.fillStyle = '#f97316';
+    ctx.fillRect(20 + leftWidth, height / 2 - 16, (width - 40) - leftWidth, 32);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '14px Space Grotesk';
+    ctx.fillText(`Left ${leftVal}%`, 20, height / 2 - 24);
+    ctx.fillText(`Right ${rightVal}%`, 20 + leftWidth + 4, height / 2 - 24);
+}
+
+function drawHeatmap(canvasId, points) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = setupCanvas(canvasId);
+    const { width, height } = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, width, height);
+    points.forEach((p) => {
+        const x = (p.x / 100) * width;
+        const y = (p.y / 100) * height;
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, p.r);
+        grad.addColorStop(0, `rgba(14, 165, 233, ${p.intensity})`);
+        grad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
 </script>
 </body>
 </html>

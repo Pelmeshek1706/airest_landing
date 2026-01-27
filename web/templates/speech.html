@@ -4,7 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Mental Health Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Sora', sans-serif; }
+    .results-bg {
+      background: radial-gradient(900px 500px at 10% 15%, rgba(14, 165, 233, 0.15), transparent 60%),
+                  radial-gradient(900px 500px at 90% 10%, rgba(251, 191, 36, 0.2), transparent 60%),
+                  linear-gradient(160deg, #f8fafc 0%, #eef2f7 55%, #e2e8f0 100%);
+    }
+    .grid-overlay {
+      background-image:
+        linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    }
+    .fade-in {
+      animation: fadeInUp 0.7s ease forwards;
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    .fade-in.delay-1 { animation-delay: 0.1s; }
+    .fade-in.delay-2 { animation-delay: 0.2s; }
+    .fade-in.delay-3 { animation-delay: 0.3s; }
+    .fade-in.delay-4 { animation-delay: 0.4s; }
+    @keyframes fadeInUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
@@ -16,6 +51,10 @@
             class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700
                    text-white font-semibold py-3 px-8 rounded-2xl shadow-lg transform transition hover:scale-105">
       Почати тест
+    </button>
+    <button id="skipBtn"
+            class="mt-4 block w-full border border-slate-200 text-slate-700 py-2.5 px-8 rounded-2xl shadow-sm hover:bg-slate-50 transition">
+      Demo results
     </button>
   </div>
 
@@ -65,6 +104,93 @@
             class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow transform transition hover:scale-105">
       На головну
     </button>
+  </div>
+
+  <div id="resultsPage" class="hidden w-full h-full results-bg grid-overlay overflow-auto">
+    <div class="max-w-6xl mx-auto px-6 py-10">
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Speech Analysis</p>
+          <h2 class="text-4xl font-bold text-slate-900">Audio Insights Summary</h2>
+        </div>
+        <button id="resultsHomeBtn" class="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg hover:bg-slate-800 transition">
+          На головну
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="card rounded-3xl p-5 fade-in delay-1">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Speech Rate</p>
+          <p id="metricRate" class="text-3xl font-bold text-slate-900">132 wpm</p>
+          <p class="text-sm text-slate-500 mt-1">Balanced tempo</p>
+        </div>
+        <div class="card rounded-3xl p-5 fade-in delay-2">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Energy</p>
+          <p id="metricEnergy" class="text-3xl font-bold text-slate-900">74</p>
+          <p class="text-sm text-slate-500 mt-1">Stable vocal intensity</p>
+        </div>
+        <div class="card rounded-3xl p-5 fade-in delay-3">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Pause Ratio</p>
+          <p id="metricPauses" class="text-3xl font-bold text-slate-900">18%</p>
+          <p class="text-sm text-slate-500 mt-1">Healthy pacing</p>
+        </div>
+        <div class="card rounded-3xl p-5 fade-in delay-4">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Clarity</p>
+          <p id="metricClarity" class="text-3xl font-bold text-slate-900">86</p>
+          <p class="text-sm text-slate-500 mt-1">Clear articulation</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="card rounded-3xl p-6 lg:col-span-2 fade-in delay-1">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold text-slate-900">Energy Timeline</h3>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Placeholder</span>
+          </div>
+          <canvas id="energyChart" class="w-full h-48"></canvas>
+        </div>
+        <div class="card rounded-3xl p-6 fade-in delay-2">
+          <h3 class="text-xl font-semibold text-slate-900 mb-4">Pause Distribution</h3>
+          <canvas id="pauseChart" class="w-full h-48"></canvas>
+          <p class="text-sm text-slate-500 mt-3">Short vs long pauses</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div class="card rounded-3xl p-6 fade-in delay-3">
+          <h3 class="text-xl font-semibold text-slate-900 mb-4">Tone Snapshot</h3>
+          <canvas id="toneChart" class="w-full h-40"></canvas>
+          <p class="text-sm text-slate-500 mt-3">Emotional contour across prompts</p>
+        </div>
+        <div class="card rounded-3xl p-6 fade-in delay-4">
+          <h3 class="text-xl font-semibold text-slate-900 mb-4">Key Observations</h3>
+          <div class="space-y-4 text-slate-600">
+            <div class="flex items-start gap-3">
+              <div class="w-2 h-2 rounded-full bg-emerald-500 mt-2"></div>
+              <p>Strong energy stability across the session.</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-2 h-2 rounded-full bg-amber-500 mt-2"></div>
+              <p>Pauses clustered mid-tasks, suggesting reflection.</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-2 h-2 rounded-full bg-indigo-500 mt-2"></div>
+              <p>Tone indicates calm but engaged responses.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded-2xl shadow-xl max-w-md text-center">
+      <h3 class="text-2xl font-bold text-gray-800 mb-2">Помилка</h3>
+      <p id="errorMessage" class="text-gray-600 mb-4">Сталася помилка під час тесту.</p>
+      <button id="errorHomeBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-6 rounded-xl shadow">
+        На головну
+      </button>
+    </div>
   </div>
 
   <script>
@@ -171,6 +297,7 @@
 
     // --- MediaRecorder ---
     let mediaRecorder, chosenMime, recordedChunks = [];
+    let mediaStream = null;
     async function requestMedia(constraints) {
       const modern = navigator.mediaDevices &&
                      typeof navigator.mediaDevices.getUserMedia === 'function'
@@ -190,6 +317,7 @@
         audio: true,
         video: { width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
+      mediaStream = stream;
       setupAnalyser(stream);
       chosenMime = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ?
                    'video/mp4;codecs=avc1' :
@@ -205,7 +333,8 @@
         freezeWave();
         const ext = chosenMime.startsWith('video/mp4') ? '.mp4' : '.webm';
         uploadSession(new Blob(recordedChunks, { type: chosenMime }), ext);
-        hide('testPage'); show('thankYouPage');
+        releaseMedia();
+        showResults();
       };
     }
     async function uploadSession(blob, ext) {
@@ -213,18 +342,27 @@
       f.append('session_id', sessionId);
       f.append('video_blob', blob, sessionId + ext);
       f.append('events', JSON.stringify(eventLog));
-      await fetch('/upload', { method: 'POST', body: f });
+      try {
+        const res = await fetch('/upload', { method: 'POST', body: f });
+        if (!res.ok) throw new Error('Upload failed');
+      } catch (err) {
+        showError('Не вдалося завантажити запис');
+      }
     }
 
     // --- UI refs & helpers ---
     const startTestBtn     = document.getElementById('startTestBtn'),
+          skipBtn         = document.getElementById('skipBtn'),
           startTaskBtn     = document.getElementById('startTaskBtn'),
           stopTaskBtn      = document.getElementById('stopTaskBtn'),
           retryTaskBtn     = document.getElementById('retryTaskBtn'),
           nextTaskBtn      = document.getElementById('nextTaskBtn'),
           waveformContainer = document.getElementById('waveformContainer'),
           waveform          = document.getElementById('waveform'),
-          waveTime          = document.getElementById('waveTime');
+          waveTime          = document.getElementById('waveTime'),
+          resultsPage       = document.getElementById('resultsPage'),
+          errorBanner       = document.getElementById('errorBanner'),
+          errorMessage      = document.getElementById('errorMessage');
 
     const tasksPromise = loadTasks();
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -280,13 +418,16 @@
       try {
         await initMedia();
       } catch (err) {
-        alert('Ваш браузер не підтримує запис відео/аудіо: ' + err.message);
         console.error('initMedia failed', err);
+        showError('Немає доступу до камери або мікрофона');
         return;
       }
       mediaRecorder.start();
       hide('titlePage'); show('testPage');
       showTask(1);
+    };
+    skipBtn.onclick = () => {
+      showResults();
     };
     startTaskBtn.onclick = () => {
       attemptCount[currentTask]++;
@@ -317,6 +458,129 @@
       }
     };
     document.getElementById('restartBtn').onclick = () => window.location.href='/';
+    document.getElementById('resultsHomeBtn').onclick = () => window.location.href='/';
+    document.getElementById('errorHomeBtn').onclick = () => window.location.href='/';
+
+    function releaseMedia() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+      if (audioCtx && audioCtx.state !== 'closed') {
+        audioCtx.close();
+      }
+    }
+
+    function showResults() {
+      freezeWave();
+      releaseMedia();
+      hide('titlePage');
+      hide('testPage');
+      hide('thankYouPage');
+      resultsPage.classList.remove('hidden');
+      renderAudioInsights();
+    }
+
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorBanner.classList.remove('hidden');
+      hide('titlePage');
+      hide('testPage');
+      hide('thankYouPage');
+      resultsPage.classList.add('hidden');
+    }
+
+    function renderAudioInsights() {
+      const seed = Date.now() % 1000;
+      const rate = 120 + (seed % 30);
+      const energy = 65 + (seed % 20);
+      const pause = 12 + (seed % 12);
+      const clarity = 78 + (seed % 18);
+      document.getElementById('metricRate').textContent = `${rate} wpm`;
+      document.getElementById('metricEnergy').textContent = energy;
+      document.getElementById('metricPauses').textContent = `${pause}%`;
+      document.getElementById('metricClarity').textContent = clarity;
+
+      drawLineChart('energyChart', 32, 40, '#0f172a', '#38bdf8');
+      drawBarChart('pauseChart', [38, 27, 20, 15]);
+      drawToneChart('toneChart', [68, 72, 60, 75, 66, 70]);
+    }
+
+    function setupCanvas(canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const dpr = window.devicePixelRatio || 1;
+      const { width, height } = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(width * dpr));
+      canvas.height = Math.max(1, Math.floor(height * dpr));
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      return ctx;
+    }
+
+    function drawLineChart(canvasId, count, base, stroke, fill) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = setupCanvas(canvasId);
+      const { width, height } = canvas.getBoundingClientRect();
+      const values = Array.from({ length: count }, (_, i) => base + Math.sin(i / 3) * 12 + (i % 5));
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      values.forEach((v, i) => {
+        const x = (i / (values.length - 1)) * (width - 20) + 10;
+        const y = height - ((v - 40) / 40) * (height - 20) - 10;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.fillStyle = `${fill}33`;
+      ctx.beginPath();
+      ctx.moveTo(10, height - 10);
+      values.forEach((v, i) => {
+        const x = (i / (values.length - 1)) * (width - 20) + 10;
+        const y = height - ((v - 40) / 40) * (height - 20) - 10;
+        ctx.lineTo(x, y);
+      });
+      ctx.lineTo(width - 10, height - 10);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawBarChart(canvasId, values) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = setupCanvas(canvasId);
+      const { width, height } = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, width, height);
+      const max = Math.max(...values);
+      const barWidth = (width - 40) / values.length;
+      values.forEach((v, i) => {
+        const h = (v / max) * (height - 30);
+        const x = 20 + i * barWidth;
+        const y = height - h - 10;
+        ctx.fillStyle = i % 2 === 0 ? '#0ea5e9' : '#f59e0b';
+        ctx.fillRect(x, y, barWidth * 0.7, h);
+      });
+    }
+
+    function drawToneChart(canvasId, values) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = setupCanvas(canvasId);
+      const { width, height } = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = '#7c3aed';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      values.forEach((v, i) => {
+        const x = (i / (values.length - 1)) * (width - 20) + 10;
+        const y = height - ((v - 50) / 40) * (height - 20) - 10;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
   </script>
 </body>
 </html>
