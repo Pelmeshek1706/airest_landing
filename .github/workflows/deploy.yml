@@ -1,9 +1,18 @@
 name: Deploy AIREST to GitHub Pages
 
+run-name: Deploy ${{ inputs.ref }} to GitHub Pages by @${{ github.actor }}
+
 on:
-  push:
-    branches: [landing_new]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch to build and publish
+        required: true
+        default: landing_new
+        type: choice
+        options:
+          - landing_new
+          - main
 
 permissions:
   contents: read
@@ -23,8 +32,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out source
+      - name: Check out selected branch
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
