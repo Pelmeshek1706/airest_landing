@@ -65,21 +65,36 @@ jobs:
         env:
           SITE_URL: https://www.airest.health/
         run: |
-          echo "Waiting 60 seconds for the public site to update..."
+          echo "CHECK: Waiting 60 seconds for the public site to update..."
           sleep 60
 
-          for attempt in {1..5}; do
-            status="$(curl --silent --show-error --output /dev/null \
-              --write-out '%{http_code}' --location --max-time 20 "$SITE_URL")"
+          echo "CHECK: URL=$SITE_URL | expected=HTTP 200 | attempts=5 | retry-delay=15s"
 
-            if [ "$status" = "200" ]; then
-              echo "Site is available: $SITE_URL"
+          for attempt in {1..5}; do
+            set +e
+            metrics="$(curl --silent --show-error --output /dev/null \
+              --write-out '%{http_code} %{time_total} %{url_effective}' \
+              --location --max-time 20 "$SITE_URL")"
+            curl_exit=$?
+            set -e
+
+            read -r status response_time final_url <<< "$metrics"
+
+            if [ "$curl_exit" -ne 0 ]; then
+              echo "::warning::CHECK $attempt/5: curl failed (exit $curl_exit); HTTP ${status:-000}; URL=$SITE_URL"
+            else
+              echo "CHECK $attempt/5: HTTP $status in ${response_time}s | $final_url"
+            fi
+
+            if [ "$curl_exit" -eq 0 ] && [ "$status" = "200" ]; then
+              echo "PASS: $SITE_URL returned HTTP 200 in ${response_time}s."
               exit 0
             fi
 
-            echo "Attempt $attempt of 5: received HTTP $status"
+            echo "CHECK: retrying in 15 seconds..."
             sleep 15
           done
 
-          echo "Site did not return HTTP 200: $SITE_URL"
+          echo "::error title=Custom-domain verification failed::Expected HTTP 200 from $SITE_URL after 5 attempts."
+          echo "FAIL: $SITE_URL did not return HTTP 200."
           exit 1
