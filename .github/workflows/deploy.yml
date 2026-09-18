@@ -60,3 +60,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Verify custom domain
+        env:
+          SITE_URL: https://www.airest.health/
+        run: |
+          echo "Waiting 60 seconds for the public site to update..."
+          sleep 60
+
+          for attempt in {1..5}; do
+            status="$(curl --silent --show-error --output /dev/null \
+              --write-out '%{http_code}' --location --max-time 20 "$SITE_URL")"
+
+            if [ "$status" = "200" ]; then
+              echo "Site is available: $SITE_URL"
+              exit 0
+            fi
+
+            echo "Attempt $attempt of 5: received HTTP $status"
+            sleep 15
+          done
+
+          echo "Site did not return HTTP 200: $SITE_URL"
+          exit 1
