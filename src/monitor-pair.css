@@ -1,0 +1,9 @@
+.mc-monitor-pair { width: 100%; aspect-ratio: 1300 / 665; position: relative; overflow: hidden; }
+.mc-monitor-canvas { position: absolute; top: 0; left: 0; width: 1300px; height: 665px; transform-origin: top left; }
+.mc-device { position: absolute; aspect-ratio: 4096 / 2816; }
+.mc-device-back { width: 882.189px; left: -66px; top: 10.36px; }
+.mc-device-front { width: 977.415px; left: 421.58px; top: 0; }
+.mc-hardware { display: block; width: 100%; height: 100%; }
+.mc-screen { position: absolute; width: 960px; height: 550px; top: 0; left: 0; overflow: hidden; transform-origin: top left; background: #f4f4f4; }
+.mc-screen-back { transform: matrix3d(.6822552361,0,0,0,0,.6849025928,0,0,0,0,1,0,113.5042976074,56.429081543,0,1); }
+.mc-screen-front { transform: matrix3d(.5911566155,.0452414048,0,.000103654,.0668529423,.6805746829,0,-.0000221086,0,0,1,0,213.570904541,59.4180505371,0,1); }
